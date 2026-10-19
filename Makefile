@@ -18,6 +18,8 @@ TOOLS := Tools
 PMTOOLS = $(shell swift build --package-path $(TOOLS) --show-bin-path $(SWIFT_FLAGS))/pmtools
 APP_EXCLUDES := --exclude ProcessorMonitor/main.swift --exclude ProcessorMonitorHelper/main.swift
 TOOLS_EXCLUDES := --exclude pmtools/main.swift
+APP_COVERAGE := .build/coverage.json
+TOOLS_COVERAGE := $(TOOLS)/.build/coverage.json
 MAX_CRAP := 16
 FILTER ?=
 
@@ -37,12 +39,11 @@ test: ## Run app tests (FILTER=<regex> to narrow, e.g. FILTER=LoadCalculatorTest
 
 coverage: tools-build ## App tests with coverage; fails unless every source file is 100% covered
 	swift test $(TEST_FLAGS) $(STRICT_FLAGS) --enable-code-coverage
-	"$(PMTOOLS)" coverage --json "$$(swift test $(TEST_FLAGS) $(STRICT_FLAGS) --show-codecov-path)" \
-		--sources "$(CURDIR)/Sources" $(APP_EXCLUDES)
+	scripts/export-coverage.sh "$$(swift test $(TEST_FLAGS) $(STRICT_FLAGS) --show-codecov-path)" $(APP_COVERAGE)
+	"$(PMTOOLS)" coverage --json $(APP_COVERAGE) --sources "$(CURDIR)/Sources" $(APP_EXCLUDES)
 
-crap: tools-build ## CRAP <= 16 for every app function (run after `make coverage`)
-	"$(PMTOOLS)" crap --json "$$(swift test $(TEST_FLAGS) $(STRICT_FLAGS) --show-codecov-path)" \
-		--sources "$(CURDIR)/Sources" $(APP_EXCLUDES) --max $(MAX_CRAP)
+crap: tools-build ## CRAP <= 16 for every app function (uses the JSON from `make coverage`)
+	"$(PMTOOLS)" crap --json $(APP_COVERAGE) --sources "$(CURDIR)/Sources" $(APP_EXCLUDES) --max $(MAX_CRAP)
 
 gate: build coverage crap tools-gate ## Full quality gate for both packages
 
@@ -56,11 +57,10 @@ tools-test: ## Run Tools tests
 
 tools-coverage: tools-build
 	swift test --package-path $(TOOLS) $(TEST_FLAGS) --enable-code-coverage
-	"$(PMTOOLS)" coverage --json "$$(swift test --package-path $(TOOLS) $(TEST_FLAGS) --show-codecov-path)" \
-		--sources "$(CURDIR)/$(TOOLS)/Sources" $(TOOLS_EXCLUDES)
+	scripts/export-coverage.sh "$$(swift test --package-path $(TOOLS) $(TEST_FLAGS) --show-codecov-path)" $(TOOLS_COVERAGE)
+	"$(PMTOOLS)" coverage --json $(TOOLS_COVERAGE) --sources "$(CURDIR)/$(TOOLS)/Sources" $(TOOLS_EXCLUDES)
 
 tools-crap: tools-build
-	"$(PMTOOLS)" crap --json "$$(swift test --package-path $(TOOLS) $(TEST_FLAGS) --show-codecov-path)" \
-		--sources "$(CURDIR)/$(TOOLS)/Sources" $(TOOLS_EXCLUDES) --max $(MAX_CRAP)
+	"$(PMTOOLS)" crap --json $(TOOLS_COVERAGE) --sources "$(CURDIR)/$(TOOLS)/Sources" $(TOOLS_EXCLUDES) --max $(MAX_CRAP)
 
 tools-gate: tools-coverage tools-crap ## Quality gate for the Tools package
