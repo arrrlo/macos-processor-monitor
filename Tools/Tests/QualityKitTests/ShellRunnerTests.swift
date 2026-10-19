@@ -26,6 +26,52 @@ import Testing
         #expect(Date().timeIntervalSince(start) < 5)
     }
 
+    /// SwiftPM starts its test runner in a separate process group; a timeout must still kill it.
+    @Test func killsDescendantsThatLeftTheProcessGroup() async throws {
+        let pidFile = directory + "/pmtools-test-\(UUID().uuidString).pid"
+        defer { unlink(pidFile) }
+        let result = ShellRunner().run("perl -e 'setpgrp(0, 0); sleep 30' & echo $! > \(pidFile); wait", in: directory, timeout: 0.5)
+        #expect(result.timedOut)
+        let text = String(decoding: try #require(FileManager.default.contents(atPath: pidFile)), as: UTF8.self)
+        let pid = try #require(pid_t(text.trimmingCharacters(in: .whitespacesAndNewlines)))
+        // A killed process lingers until launchd reaps it.
+        for _ in 0..<100 where kill(pid, 0) == 0 {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        #expect(kill(pid, 0) != 0)
+    }
+
+    @Test func listsDescendantsRecursively() throws {
+        #expect(ShellRunner.descendants(of: 999_999).isEmpty)
+        let shell = Process()
+        shell.executableURL = URL(fileURLWithPath: "/bin/sh")
+        shell.arguments = ["-c", "sleep 30 & wait"]
+        try shell.run()
+        usleep(300_000)
+        let grandchildren = ShellRunner.descendants(of: shell.processIdentifier)
+        let tree = ShellRunner.descendants(of: getpid())
+        grandchildren.forEach { kill($0, SIGKILL) }
+        shell.terminate()
+        #expect(grandchildren.count == 1)
+        #expect(tree.contains(shell.processIdentifier))
+        #expect(grandchildren.allSatisfy { tree.contains($0) })
+    }
+
+    @Test func listsMoreChildrenThanASmallBufferHolds() throws {
+        let shell = Process()
+        shell.executableURL = URL(fileURLWithPath: "/bin/sh")
+        shell.arguments = ["-c", "for i in $(seq 70); do sleep 30 & done; wait"]
+        try shell.run()
+        var children: [pid_t] = []
+        for _ in 0..<100 where children.count < 70 {
+            usleep(20_000)
+            children = ShellRunner.descendants(of: shell.processIdentifier)
+        }
+        children.forEach { kill($0, SIGKILL) }
+        shell.terminate()
+        #expect(children.count == 70)
+    }
+
     @Test func reportsSpawnFailures() {
         let result = ShellRunner().run("true", in: "/no/such/directory", timeout: 10)
         #expect(result.status == -1)

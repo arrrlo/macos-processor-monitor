@@ -73,12 +73,26 @@ public struct ShellRunner: CommandRunning {
         while waitpid(pid, &status, WNOHANG) == 0 {
             // mutation:disable-next-line a continuous clock never lands exactly on the deadline
             if Date() > deadline {
+                // Collected first: once a parent dies, its children are re-parented to launchd.
+                let tree = Self.descendants(of: pid)
                 kill(-pid, SIGKILL)
+                tree.forEach { kill($0, SIGKILL) }
             }
             // mutation:disable-next-line only the polling interval; without it the loop spins but behaves the same
             usleep(20_000)
         }
         return status
+    }
+
+    /// Every process started below `pid`. SwiftPM runs tests in their own process group, so killing
+    /// the group is not enough.
+    static func descendants(of pid: pid_t) -> [pid_t] {
+        var buffer = [pid_t](repeating: 0, count: 1024)
+        let count = buffer.withUnsafeMutableBufferPointer {
+            proc_listchildpids(pid, $0.baseAddress, Int32($0.count * MemoryLayout<pid_t>.size))
+        }
+        let children = Array(buffer.prefix(max(Int(count), 0)))
+        return children + children.flatMap(descendants)
     }
 
     /// `WIFEXITED`/`WEXITSTATUS`, which Swift does not import.
