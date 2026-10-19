@@ -1,0 +1,16 @@
+# SwiftPM / build output
+.build/
+.swiftpm/
+build/
+*.pkg
+*.profraw
+*.profdata
+
+# macOS
+.DS_Store
+
+# Claude Code (local only)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.mcp.json
