@@ -23,8 +23,10 @@ let package = Package(
         .target(name: "ProcessorMonitorUI", dependencies: ["ProcessorMonitorCore", "ProcessorMonitorSystem"]),
         .executableTarget(name: "ProcessorMonitor", dependencies: ["ProcessorMonitorUI"]),
         .executableTarget(name: "ProcessorMonitorHelper", dependencies: ["ProcessorMonitorSystem"]),
-        .testTarget(name: "ProcessorMonitorCoreTests", dependencies: ["ProcessorMonitorCore"]),
-        .testTarget(name: "ProcessorMonitorSystemTests", dependencies: ["ProcessorMonitorSystem"]),
-        .testTarget(name: "ProcessorMonitorUITests", dependencies: ["ProcessorMonitorUI"]),
+        // Fakes shared by the test targets. Lives under Tests/, so the coverage gate ignores it.
+        .target(name: "TestSupport", dependencies: ["ProcessorMonitorCore"], path: "Tests/TestSupport"),
+        .testTarget(name: "ProcessorMonitorCoreTests", dependencies: ["ProcessorMonitorCore", "TestSupport"]),
+        .testTarget(name: "ProcessorMonitorSystemTests", dependencies: ["ProcessorMonitorSystem", "TestSupport"]),
+        .testTarget(name: "ProcessorMonitorUITests", dependencies: ["ProcessorMonitorUI", "TestSupport"]),
     ]
 )
