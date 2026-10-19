@@ -8,7 +8,17 @@ A lightweight, native menu bar monitor for Apple Silicon processors.
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black)
 ![Apple Silicon](https://img.shields.io/badge/arch-arm64-black)
 
-<!-- SCREENSHOTS -->
+The menu bar shows the processor load and temperature next to a chip icon, e.g. `23%  49°C`.
+Click it for every metric and the top processes, or open the dashboard:
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
+    <img src="docs/images/dashboard-light.png" width="600" alt="Dashboard with processor load, temperature, per-core occupancy of the Super and Performance clusters, and the top 10 processes">
+  </picture>
+</p>
+
+<sub>Live readings from an M5 Max (6 Super + 12 Performance cores), rendered by `make screenshots`.</sub>
 
 ## Features
 

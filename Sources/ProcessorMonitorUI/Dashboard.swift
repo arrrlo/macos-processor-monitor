@@ -58,7 +58,7 @@ private struct Card<Content: View>: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.06)))
     }
 }
 
@@ -148,7 +148,7 @@ private struct CoreBar: View {
                 RoundedRectangle(cornerRadius: 2).fill(Color.accentColor).frame(height: DashboardModel.barWidth(core.load, of: Self.height))
             }
             .frame(width: 16, height: Self.height)
-            Text("\(core.index)").font(.system(size: 8)).foregroundStyle(.secondary)
+            Text(verbatim: String(core.index)).font(.system(size: 8)).foregroundStyle(.secondary)
         }
         .help("Core \(core.index): \(MetricFormatter.percent(core.load))")
     }
@@ -194,7 +194,8 @@ private struct ProcessRowView: View {
                 Image(systemName: "gearshape").foregroundStyle(.secondary).frame(width: 16, height: 16)
             }
             Text(app?.name ?? process.row.title).lineLimit(1).frame(width: 330, alignment: .leading)
-            Text("\(process.pid)").monospacedDigit().foregroundStyle(.secondary)
+            // verbatim: a PID is an identifier, not a number to format with thousands separators.
+            Text(verbatim: String(process.pid)).monospacedDigit().foregroundStyle(.secondary)
             Text(process.row.value).monospacedDigit()
         }
     }

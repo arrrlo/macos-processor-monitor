@@ -18,9 +18,12 @@ extension AppKitTests {
             let first = ticks.read()!
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             let load = LoadCalculator.load(from: first, to: ticks.read()!)!
+            // Kept alive until the reply arrives: releasing the client closes its connection.
+            let service = TopProcessesService.live()
             let processes = await withCheckedContinuation { continuation in
-                TopProcessesService.live().topProcesses(limit: 10) { continuation.resume(returning: $0) }
+                service.topProcesses(limit: 10) { continuation.resume(returning: $0) }
             }
+            withExtendedLifetime(service) {}
             let snapshot = MonitorSnapshot(
                 load: load,
                 clusters: topology.clusterLoads(load),
@@ -48,15 +51,6 @@ extension AppKitTests {
                 view.frame = NSRect(origin: .zero, size: view.fittingSize)
                 try write(view, to: name, appearance: appearance)
             }
-        }
-
-        @Test func statusItem() async throws {
-            let (snapshot, _) = await liveSnapshot()
-            let controller = StatusItemController(statusBar: NSStatusBar(), menu: NSMenu())
-            controller.update(title: MetricFormatter.statusTitle(snapshot))
-            let button = try #require(controller.item.button)
-            try write(button, to: "status-item.png", appearance: .darkAqua)
-            controller.remove()
         }
     }
 }
