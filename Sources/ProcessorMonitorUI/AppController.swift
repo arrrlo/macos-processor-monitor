@@ -27,10 +27,12 @@ public final class AppController {
     private let statusBar: NSStatusBar
     private let workspaceCenter: NotificationCenter
     private let actions: AppActions
+    private let now: () -> Double
     private let makeEngine: EngineFactory
     private var engine: SamplingEngine?
     private var observers: [NSObjectProtocol] = []
     private var latest = MonitorSnapshot.empty
+    private var titleThrottle = StatusTitleThrottle()
 
     private lazy var demand = ProcessDemand { [weak self] active in self?.engine?.setProcessDemand(active) }
     lazy var statusItem = StatusItemController(statusBar: statusBar, menu: menu.menu)
@@ -52,6 +54,7 @@ public final class AppController {
         statusBar: NSStatusBar,
         workspaceCenter: NotificationCenter,
         actions: AppActions,
+        now: @escaping () -> Double,
         makeEngine: @escaping EngineFactory
     ) {
         self.topology = topology
@@ -61,6 +64,7 @@ public final class AppController {
         self.statusBar = statusBar
         self.workspaceCenter = workspaceCenter
         self.actions = actions
+        self.now = now
         self.makeEngine = makeEngine
     }
 
@@ -79,6 +83,7 @@ public final class AppController {
             statusBar: statusBar,
             workspaceCenter: NSWorkspace.shared.notificationCenter,
             actions: actions,
+            now: { ProcessInfo.processInfo.systemUptime },
             makeEngine: { publish in
                 SamplingEngine(
                     sources: SamplingEngine.Sources(
@@ -133,7 +138,9 @@ public final class AppController {
 
     func render(_ snapshot: MonitorSnapshot) {
         latest = snapshot
-        statusItem.update(title: MetricFormatter.statusTitle(snapshot))
+        if titleThrottle.shouldShow(load: snapshot.load?.overall.total, temperature: snapshot.temperature?.average, at: now()) {
+            statusItem.update(title: MetricFormatter.statusTitle(snapshot))
+        }
         refreshMenu()
         refreshDashboard()
     }

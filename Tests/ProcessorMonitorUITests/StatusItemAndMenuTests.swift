@@ -13,12 +13,21 @@ extension AppKitTests {
             #expect(button.title == "—  —")
             #expect(controller.item.menu === menu)
             #expect(button.image != nil)
-            #expect(button.font == NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular))
+            #expect(button.font == StatusItemController.font)
+            #expect(StatusItemController.font == NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular))
 
+            // A fixed length means a changing reading never resizes the item, which on macOS
+            // re-lays out the menu bar and sends a scene update to the system on every tick.
+            let widest = ("100%  100°C" as NSString).size(withAttributes: [.font: StatusItemController.font]).width
+            #expect(controller.item.length == StatusItemController.length)
+            #expect(StatusItemController.length >= widest + 16)
+            #expect(StatusItemController.length <= widest + 40)
+            controller.update(title: "100%  100°C")
+            #expect(controller.item.length == StatusItemController.length)
             controller.update(title: "23%  49°C")
             controller.update(title: "23%  49°C")
             #expect(button.title == "23%  49°C")
-            #expect(controller.titleChanges == 2)
+            #expect(controller.titleChanges == 3)
             #expect(button.window?.isVisible == true)
             controller.remove()
             #expect(button.window?.isVisible == false)

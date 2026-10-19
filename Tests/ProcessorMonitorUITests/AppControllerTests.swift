@@ -41,6 +41,7 @@ extension AppKitTests {
                     showAbout: { log.entries.append("about") },
                     quit: { log.entries.append("quit") }
                 ),
+                now: { scheduler.now },
                 makeEngine: { publish in
                     SamplingEngine(
                         sources: SamplingEngine.Sources(
@@ -71,6 +72,23 @@ extension AppKitTests {
             harness.controller.stop()
             #expect(!harness.controller.isRunning)
             #expect(button.window?.isVisible == false)
+        }
+
+        @Test func smallChangesWaitBeforeRedrawingTheMenuBar() async throws {
+            let harness = makeHarness()
+            harness.sources.ticks = FakeSources.ticks(busy: [25, 26, 26, 26, 26, 26, 26])
+            harness.controller.start()
+            harness.scheduler.advance(by: 2)
+            await settle()
+            let button = try #require(harness.controller.statusItem.item.button)
+            #expect(button.title == "25%  49°C")
+            harness.scheduler.advance(by: 2)
+            await settle()
+            #expect(button.title == "25%  49°C")
+            harness.scheduler.advance(by: 10)
+            await settle()
+            #expect(button.title == "26%  49°C")
+            harness.controller.stop()
         }
 
         @Test func openingTheMenuRequestsProcessesAndFillsIt() async {

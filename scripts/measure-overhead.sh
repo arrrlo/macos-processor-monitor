@@ -21,11 +21,11 @@ sleep "$DURATION"
 END=$(cpu_seconds "$PID")
 
 RSS_KB=$(ps -o rss= -p "$PID" | tr -d ' ')
-FOOTPRINT=$(footprint -p "$PID" 2>/dev/null | awk '/Footprint:/ { print $2, $3; exit }' || true)
+FOOTPRINT=$(footprint -p "$PID" 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "Footprint:") { print $(i + 1), $(i + 2); exit } }' || true)
 awk -v start="$START" -v end="$END" -v duration="$DURATION" -v rss="$RSS_KB" -v footprint="$FOOTPRINT" 'BEGIN {
     printf "CPU: %.3f s over %d s = %.3f%% average\n", end - start, duration, (end - start) / duration * 100
-    printf "Resident memory: %.1f MB\n", rss / 1024
-    if (footprint != "") printf "Physical footprint: %s\n", footprint
+    if (footprint != "") printf "Physical footprint (private memory): %s\n", footprint
+    printf "Resident memory (includes shared system frameworks): %.1f MB\n", rss / 1024
 }'
 if pgrep -f "PrivilegedHelperTools/io.github.arrrlo.macos-processor-monitor.helper" > /dev/null; then
     echo "Helper: running"

@@ -22,6 +22,10 @@ chmod 755 "$ROOT/Library/PrivilegedHelperTools/$LABEL.helper"
 chmod 644 "$ROOT/Library/LaunchDaemons/$LABEL.helper.plist" "$ROOT/Library/LaunchAgents/$LABEL.plist"
 chmod 755 packaging/scripts/preinstall packaging/scripts/postinstall
 
+# Extended attributes (provenance, quarantine) would otherwise end up in the payload as ._ files.
+xattr -cr "$ROOT"
+export COPYFILE_DISABLE=1
+
 # Without this, Installer "relocates" the update to any other copy of the bundle it finds
 # (e.g. one in build/) instead of writing to /Applications.
 pkgbuild --analyze --root "$ROOT" "$OUT/component.plist"

@@ -144,3 +144,36 @@ public final class ProcessDemand {
         onChange(active)
     }
 }
+
+/// Decides when the menu bar text is worth redrawing. On macOS 26 every status item change costs
+/// about 7 ms of AppKit work (a snapshot redrawn into each display's menu bar), which dominates
+/// the app's running cost. Real movement shows at once; jitter waits until the title is 10 s old.
+public struct StatusTitleThrottle: Sendable {
+    public static let loadStep = 0.03
+    public static let temperatureStep = 2.0
+    public static let maximumAge = 10.0
+
+    private var shown: (load: Double?, temperature: Double?, time: Double)?
+
+    public init() {}
+
+    /// Records the reading as shown when it returns true.
+    public mutating func shouldShow(load: Double?, temperature: Double?, at time: Double) -> Bool {
+        guard let last = shown,
+              time - last.time < Self.maximumAge,
+              !Self.moved(last.load, load, by: Self.loadStep),
+              !Self.moved(last.temperature, temperature, by: Self.temperatureStep) else {
+            shown = (load, temperature, time)
+            return true
+        }
+        return false
+    }
+
+    private static func moved(_ old: Double?, _ new: Double?, by step: Double) -> Bool {
+        switch (old, new) {
+        case let (old?, new?): abs(new - old) >= step
+        case (nil, nil): false
+        default: true
+        }
+    }
+}
