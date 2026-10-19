@@ -35,6 +35,22 @@ import Testing
 
     @Test func discardedCallsAreRemoved() {
         #expect(mutants("func f() {\n    g()\n    let x = h()\n    _ = i()\n}") == ["2:5 removeCall g() -> "])
+        #expect(mutants("func f() { a.b.c() }") == ["1:12 removeCall a.b.c() -> "])
+    }
+
+    /// With warnings as errors, a statement-level initializer call can only be a result-builder
+    /// component (a SwiftUI view), not a discarded side effect.
+    @Test func resultBuilderComponentsAreNotRemoved() {
+        let source = """
+        var body: some View {
+            VStack {
+                Text("a").font(.headline)
+                Card(model: m)
+                Swift.print("x")
+            }
+        }
+        """
+        #expect(mutants(source) == ["5:9 removeCall Swift.print(\"x\") -> "])
     }
 
     @Test func otherOperatorsAreIgnored() {

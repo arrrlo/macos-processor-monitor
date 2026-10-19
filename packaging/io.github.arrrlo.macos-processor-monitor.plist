@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Starts the menu bar app at login for every user. The app's "Launch at Login" item
+	     toggles it per user with `launchctl disable|enable gui/<uid>/<label>`. -->
+	<key>Label</key>
+	<string>io.github.arrrlo.macos-processor-monitor</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Applications/macOS Processor Monitor.app/Contents/MacOS/ProcessorMonitor</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>io.github.arrrlo.macos-processor-monitor</string>
+	</array>
+</dict>
+</plist>

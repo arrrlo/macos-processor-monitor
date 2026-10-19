@@ -1,4 +1,5 @@
 import Foundation
+import os
 import ProcessorMonitorCore
 
 /// The privileged helper's only operation. It is read-only and returns what `ps` already shows
@@ -82,12 +83,12 @@ public final class HelperDaemon: NSObject, NSXPCListenerDelegate {
 }
 
 /// App-side connection to the helper; reconnects after the helper exits, crashes or hangs.
-public final class HelperClient: @unchecked Sendable {
+public final class HelperClient: Sendable {
     private let timeout: Double
     private let scheduler: any Scheduling
     private let makeConnection: @Sendable () -> NSXPCConnection
-    private let lock = NSLock()
-    private var connection: NSXPCConnection?
+    /// NSXPCConnection is thread-safe but not marked Sendable.
+    private let connection = OSAllocatedUnfairLock<NSXPCConnection?>(uncheckedState: nil)
 
     /// - Parameter timeout: seconds to wait for a reply. A message to a dead or hung peer
     ///   otherwise never completes.
@@ -105,7 +106,7 @@ public final class HelperClient: @unchecked Sendable {
     }
 
     deinit {
-        connection?.invalidate()
+        connection.withLockUnchecked { $0 }?.invalidate()
     }
 
     /// `nil` when the helper is not reachable or does not answer in time.
@@ -129,22 +130,21 @@ public final class HelperClient: @unchecked Sendable {
     }
 
     private func currentConnection() -> NSXPCConnection {
-        lock.lock()
-        defer { lock.unlock() }
-        if let connection {
-            return connection
+        connection.withLockUnchecked { stored in
+            if let stored {
+                return stored
+            }
+            let fresh = makeConnection()
+            fresh.remoteObjectInterface = HelperWire.interface()
+            // XPC calls this asynchronously, never from inside resume(), so the lock is free by then.
+            fresh.invalidationHandler = { [weak self] in self?.dropConnection() }
+            fresh.resume()
+            stored = fresh
+            return fresh
         }
-        let fresh = makeConnection()
-        fresh.remoteObjectInterface = HelperWire.interface()
-        fresh.invalidationHandler = { [weak self] in self?.dropConnection() }
-        fresh.resume()
-        connection = fresh
-        return fresh
     }
 
     private func dropConnection() {
-        lock.lock()
-        connection = nil
-        lock.unlock()
+        connection.withLockUnchecked { $0 = nil }
     }
 }

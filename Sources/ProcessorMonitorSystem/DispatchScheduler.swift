@@ -13,7 +13,7 @@ public struct DispatchScheduler: Scheduling {
 
     public func schedule(after delay: Double, _ action: @escaping @Sendable () -> Void) -> any Cancellable {
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + delay, leeway: leeway(for: delay))
+        timer.schedule(deadline: .now() + delay, leeway: Self.leeway(for: delay, fraction: leewayFraction))
         let handle = TimerHandle(timer)
         timer.setEventHandler {
             action()
@@ -25,14 +25,14 @@ public struct DispatchScheduler: Scheduling {
 
     public func scheduleRepeating(every interval: Double, _ action: @escaping @Sendable () -> Void) -> any Cancellable {
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: leeway(for: interval))
+        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: Self.leeway(for: interval, fraction: leewayFraction))
         timer.setEventHandler(handler: action)
         timer.resume()
         return TimerHandle(timer)
     }
 
-    private func leeway(for seconds: Double) -> DispatchTimeInterval {
-        .nanoseconds(Int(seconds * leewayFraction * 1_000_000_000))
+    static func leeway(for seconds: Double, fraction: Double) -> DispatchTimeInterval {
+        .nanoseconds(Int(seconds * fraction * 1_000_000_000))
     }
 }
 

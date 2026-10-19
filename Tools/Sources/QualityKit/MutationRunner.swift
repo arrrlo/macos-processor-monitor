@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 public struct MutationConfiguration: Sendable {
     public var packageDirectory: String
@@ -67,27 +68,34 @@ public final class MutationRunner: Sendable {
     public func run(_ mutants: [Mutant]) throws -> [MutantResult] {
         guard !mutants.isEmpty else { return [] }
         let workspaces = (0..<max(configuration.jobs, 1)).map(workspacePath)
-        let baselines = Synchronized<[Int: Result<Double, Failure>]>([:])
+        let baselines = OSAllocatedUnfairLock<[Int: Result<Double, Failure>]>(initialState: [:])
         DispatchQueue.concurrentPerform(iterations: workspaces.count) { index in
             let result = baseline(in: workspaces[index])
-            baselines.mutate { $0[index] = result }
+            baselines.withLock { $0[index] = result }
         }
-        let durations = try baselines.value.sorted { $0.key < $1.key }.map { try $0.value.get() }
+        let durations = try baselines.withLock { $0 }.sorted { $0.key < $1.key }.map { try $0.value.get() }
         let timeout = configuration.testTimeout(baseline: durations.reduce(0, max))
 
-        let next = Synchronized(0)
-        let results = Synchronized<[Int: MutantResult]>([:])
+        let next = OSAllocatedUnfairLock(initialState: 0)
+        let results = OSAllocatedUnfairLock<[Int: MutantResult]>(initialState: [:])
         DispatchQueue.concurrentPerform(iterations: workspaces.count) { worker in
-            while let index = next.take(below: mutants.count) {
+            while let index = next.withLock({ Self.take(&$0, below: mutants.count) }) {
                 let result = MutantResult(mutant: mutants[index], outcome: evaluate(mutants[index], in: workspaces[worker], timeout: timeout))
-                let done = results.mutate { finished -> Int in
+                let done = results.withLock { finished -> Int in
                     finished[index] = result
                     return finished.count
                 }
                 environment.output("[\(done)/\(mutants.count)] \(result.outcome.rawValue): \(result.mutant.describe(root: root))")
             }
         }
-        return results.value.sorted { $0.key < $1.key }.map(\.value)
+        return results.withLock { $0 }.sorted { $0.key < $1.key }.map(\.value)
+    }
+
+    /// Hands out 0, 1, 2… until `limit`, then `nil`.
+    static func take(_ counter: inout Int, below limit: Int) -> Int? {
+        guard counter < limit else { return nil }
+        defer { counter += 1 }
+        return counter
     }
 
     private func workspacePath(_ index: Int) -> String {
@@ -173,39 +181,5 @@ public struct MutationReport: Equatable, Sendable {
             lines += survivors.map { "  \($0.mutant.describe(root: root))" }
         }
         return lines
-    }
-}
-
-/// A lock-protected value shared by the worker threads.
-final class Synchronized<Value>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stored: Value
-
-    init(_ value: Value) {
-        stored = value
-    }
-
-    var value: Value {
-        lock.lock()
-        defer { lock.unlock() }
-        return stored
-    }
-
-    @discardableResult
-    func mutate<T>(_ body: (inout Value) -> T) -> T {
-        lock.lock()
-        defer { lock.unlock() }
-        return body(&stored)
-    }
-}
-
-extension Synchronized where Value == Int {
-    /// Hands out 0, 1, 2… until `limit`, then `nil`.
-    func take(below limit: Int) -> Int? {
-        mutate { counter -> Int? in
-            guard counter < limit else { return nil }
-            defer { counter += 1 }
-            return counter
-        }
     }
 }

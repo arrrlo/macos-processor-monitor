@@ -26,7 +26,7 @@ MUTATION_JOBS ?= 6
 MUTATION_EXCLUDES := --exclude Sources/ProcessorMonitor/main.swift --exclude Sources/ProcessorMonitorHelper/main.swift
 
 .PHONY: help build test coverage crap gate mutate tools-build tools-test tools-coverage tools-crap tools-gate \
-        tools-mutate app pkg run clean
+        tools-mutate app pkg run overhead icon clean
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-16s %s\n", $$1, $$2}'
@@ -78,3 +78,24 @@ tools-mutate: tools-build ## Mutation testing of the Tools package
 		--build 'swift build --build-tests -j 3 $(SWIFT_FLAGS)' \
 		--test 'swift test --skip-build $(TEST_FLAGS)' \
 		$(if $(FILE),--file '$(FILE)')
+
+# ---- Packaging ---------------------------------------------------------------------------
+
+app: ## Release build/macOS Processor Monitor.app and helper (ad-hoc signed)
+	scripts/build-app.sh
+
+pkg: app ## Single-file installer build/macos-processor-monitor-<VERSION>.pkg
+	scripts/build-pkg.sh
+
+run: app ## Build and launch the .app (quits a running copy first)
+	-pkill -x ProcessorMonitor
+	open "build/macOS Processor Monitor.app"
+
+overhead: ## Average CPU and memory of the running app over SECONDS (default 300)
+	scripts/measure-overhead.sh $(or $(SECONDS),300)
+
+icon: ## Regenerate packaging/AppIcon.icns
+	scripts/make-icon.sh
+
+clean: ## Remove all build output
+	rm -rf .build build $(TOOLS)/.build

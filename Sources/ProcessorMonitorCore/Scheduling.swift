@@ -1,4 +1,4 @@
-import Foundation
+import os
 
 public protocol Cancellable: Sendable {
     func cancel()
@@ -14,12 +14,11 @@ public protocol Scheduling: Sendable {
 
 /// Calls `onIdle` once `timeout` seconds pass without `activity()`. The helper uses it to exit
 /// when nobody asks for data, so it costs nothing while the menu and dashboard are closed.
-public final class IdleMonitor: @unchecked Sendable {
+public final class IdleMonitor: Sendable {
     private let timeout: Double
     private let scheduler: any Scheduling
     private let onIdle: @Sendable () -> Void
-    private let lock = NSLock()
-    private var pending: (any Cancellable)?
+    private let pending = OSAllocatedUnfairLock<(any Cancellable)?>(initialState: nil)
 
     public init(timeout: Double, scheduler: any Scheduling, onIdle: @escaping @Sendable () -> Void) {
         self.timeout = timeout
@@ -28,9 +27,9 @@ public final class IdleMonitor: @unchecked Sendable {
     }
 
     public func activity() {
-        lock.lock()
-        defer { lock.unlock() }
-        pending?.cancel()
-        pending = scheduler.schedule(after: timeout, onIdle)
+        pending.withLock { pending in
+            pending?.cancel()
+            pending = scheduler.schedule(after: timeout, onIdle)
+        }
     }
 }

@@ -19,7 +19,9 @@ extension AppKitTests {
             controller.update(title: "23%  49°C")
             #expect(button.title == "23%  49°C")
             #expect(controller.titleChanges == 2)
+            #expect(button.window?.isVisible == true)
             controller.remove()
+            #expect(button.window?.isVisible == false)
         }
     }
 
@@ -48,8 +50,8 @@ extension AppKitTests {
                 "---",
                 "About macOS Processor Monitor", "Quit macOS Processor Monitor",
             ])
-            #expect(menu.items[1].indentationLevel == 1)
-            #expect(menu.items[3].indentationLevel == 1)
+            // load, user, system, idle, temperature, 2 clusters, separator, header, 10 processes, …
+            #expect(menu.items.map(\.indentationLevel) == [0, 1, 1, 1, 0, 0, 0, 0, 0] + Array(repeating: 1, count: 10) + Array(repeating: 0, count: 7))
             #expect(menu.items[9...18].allSatisfy { $0.isHidden })
             #expect(menu.items[20].keyEquivalent == "d")
             #expect(menu.items[25].keyEquivalent == "q")

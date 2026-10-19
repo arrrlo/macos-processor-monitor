@@ -97,6 +97,8 @@ public final class AppController {
 
     private var clusterNames: [String] { topology.clusters.map(\.name) }
 
+    var isRunning: Bool { engine?.isRunning == true }
+
     public func start() {
         let engine = makeEngine { [weak self] snapshot in
             Task { @MainActor in self?.render(snapshot) }

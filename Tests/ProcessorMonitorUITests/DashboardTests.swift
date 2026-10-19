@@ -81,10 +81,16 @@ extension AppKitTests {
             controller.show()
             let window = try #require(controller.window)
             #expect(window.title == "macOS Processor Monitor")
+            #expect(window.styleMask == [.titled, .closable, .miniaturizable])
+            #expect(window.frame.height > 300)
+            let screen = try #require(window.screen ?? NSScreen.main)
+            #expect(abs(window.frame.midX - screen.visibleFrame.midX) <= 1)
             #expect(controller.isVisible)
+            #expect(controller.model.snapshot == .sample)
             controller.show()
             #expect(controller.window === window)
             controller.update(DashboardModel(snapshot: .empty, clusterNames: [], apps: [:]))
+            #expect(controller.model.snapshot == .empty)
 
             window.close()
             #expect(controller.window == nil)
@@ -97,9 +103,13 @@ extension AppKitTests {
             let controller = DashboardWindowController { visibility.append($0) }
             controller.show()
             let window = try #require(controller.window)
-            window.miniaturize(nil)
+            window.orderOut(nil)
             controller.windowDidChangeOcclusionState(Notification(name: NSWindow.didChangeOcclusionStateNotification, object: window))
-            #expect(visibility.first == true)
+            // Without a running app the window server never reports the window as visible,
+            // so this normally takes the "hidden" path; either way state must follow occlusion.
+            let shown = window.occlusionState.contains(.visible)
+            #expect(controller.isVisible == shown)
+            #expect(visibility == (shown ? [true] : [true, false]))
             window.close()
             #expect(!controller.isVisible)
         }

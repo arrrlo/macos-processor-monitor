@@ -1,4 +1,4 @@
-import Foundation
+import os
 
 /// Everything the UI shows, published as one value.
 public struct MonitorSnapshot: Equatable, Sendable {
@@ -20,7 +20,7 @@ public struct MonitorSnapshot: Equatable, Sendable {
 /// The app's only periodic work. Each tick costs one `host_processor_info` call; temperature is
 /// read at most every `temperatureInterval` seconds; the process table is only measured while
 /// someone looks at it (menu open or dashboard visible), with at most one request in flight.
-public final class SamplingEngine: @unchecked Sendable {
+public final class SamplingEngine: Sendable {
     public struct Sources: Sendable {
         let cpuTicks: @Sendable () -> CPUTicksSample?
         let temperature: @Sendable () -> TemperatureSummary?
@@ -40,20 +40,22 @@ public final class SamplingEngine: @unchecked Sendable {
         }
     }
 
+    private struct State: Sendable {
+        var interval: Double
+        var timer: (any Cancellable)?
+        var previousTicks: CPUTicksSample?
+        var secondsSinceTemperature: Double = 0
+        var snapshot = MonitorSnapshot.empty
+        var processDemand = false
+        var processRequestInFlight = false
+    }
+
     private let sources: Sources
     private let scheduler: any Scheduling
     private let temperatureInterval: Double
     private let processLimit: Int
     private let publish: @Sendable (MonitorSnapshot) -> Void
-    private let lock = NSLock()
-
-    private var currentInterval: Double
-    private var timer: (any Cancellable)?
-    private var previousTicks: CPUTicksSample?
-    private var secondsSinceTemperature: Double = 0
-    private var snapshot = MonitorSnapshot.empty
-    private var processDemand = false
-    private var processRequestInFlight = false
+    private let state: OSAllocatedUnfairLock<State>
 
     public init(
         sources: Sources,
@@ -68,59 +70,57 @@ public final class SamplingEngine: @unchecked Sendable {
         self.temperatureInterval = temperatureInterval
         self.processLimit = processLimit
         self.publish = publish
-        currentInterval = interval
+        state = OSAllocatedUnfairLock(initialState: State(interval: interval))
     }
 
-    public var interval: Double { locked { currentInterval } }
-    public var isRunning: Bool { locked { timer != nil } }
+    public var interval: Double { state.withLock { $0.interval } }
+    public var isRunning: Bool { state.withLock { $0.timer != nil } }
 
     /// Takes a fresh baseline (so a pause is not averaged into the next reading) and starts ticking.
     public func start() {
-        let started = locked { () -> Bool in
-            guard timer == nil else { return false }
-            previousTicks = sources.cpuTicks()
-            timer = scheduleTicks()
+        let started = state.withLock { state -> Bool in
+            guard state.timer == nil else { return false }
+            state.previousTicks = sources.cpuTicks()
+            state.timer = scheduleTicks(every: state.interval)
             return true
         }
         guard started else { return }
         readTemperature()
-        requestProcessesIfNeeded()
         publishSnapshot()
     }
 
     public func stop() {
-        locked {
-            timer?.cancel()
-            timer = nil
+        state.withLock { state in
+            state.timer?.cancel()
+            state.timer = nil
         }
     }
 
     public func setInterval(_ seconds: Double) {
-        locked {
-            currentInterval = seconds
-            guard let running = timer else { return }
+        state.withLock { state in
+            state.interval = seconds
+            guard let running = state.timer else { return }
             running.cancel()
-            timer = scheduleTicks()
+            state.timer = scheduleTicks(every: seconds)
         }
     }
 
     public func setProcessDemand(_ active: Bool) {
-        locked { processDemand = active }
+        state.withLock { $0.processDemand = active }
         requestProcessesIfNeeded()
     }
 
     // MARK: - Ticking
 
-    /// Call with the lock held.
-    private func scheduleTicks() -> any Cancellable {
-        scheduler.scheduleRepeating(every: currentInterval) { [weak self] in self?.tick() }
+    private func scheduleTicks(every interval: Double) -> any Cancellable {
+        scheduler.scheduleRepeating(every: interval) { [weak self] in self?.tick() }
     }
 
     private func tick() {
         updateLoad(with: sources.cpuTicks())
-        let temperatureDue = locked { () -> Bool in
-            secondsSinceTemperature += currentInterval
-            return secondsSinceTemperature >= temperatureInterval
+        let temperatureDue = state.withLock { state -> Bool in
+            state.secondsSinceTemperature += state.interval
+            return state.secondsSinceTemperature >= temperatureInterval
         }
         if temperatureDue {
             readTemperature()
@@ -130,28 +130,29 @@ public final class SamplingEngine: @unchecked Sendable {
     }
 
     private func updateLoad(with ticks: CPUTicksSample?) {
-        locked {
+        let topology = sources.topology
+        state.withLock { state in
             guard let ticks else { return }
-            if let previous = previousTicks, let load = LoadCalculator.load(from: previous, to: ticks) {
-                snapshot.load = load
-                snapshot.clusters = sources.topology.clusterLoads(load)
+            if let previous = state.previousTicks, let load = LoadCalculator.load(from: previous, to: ticks) {
+                state.snapshot.load = load
+                state.snapshot.clusters = topology.clusterLoads(load)
             }
-            previousTicks = ticks
+            state.previousTicks = ticks
         }
     }
 
     private func readTemperature() {
         let temperature = sources.temperature()
-        locked {
-            snapshot.temperature = temperature
-            secondsSinceTemperature = 0
+        state.withLock { state in
+            state.snapshot.temperature = temperature
+            state.secondsSinceTemperature = 0
         }
     }
 
     private func requestProcessesIfNeeded() {
-        let shouldRequest = locked { () -> Bool in
-            guard processDemand, !processRequestInFlight else { return false }
-            processRequestInFlight = true
+        let shouldRequest = state.withLock { state -> Bool in
+            guard state.processDemand, !state.processRequestInFlight else { return false }
+            state.processRequestInFlight = true
             return true
         }
         guard shouldRequest else { return }
@@ -161,20 +162,14 @@ public final class SamplingEngine: @unchecked Sendable {
     }
 
     private func receive(_ result: TopProcessesResult) {
-        locked {
-            processRequestInFlight = false
-            snapshot.topProcesses = result
+        state.withLock { state in
+            state.processRequestInFlight = false
+            state.snapshot.topProcesses = result
         }
         publishSnapshot()
     }
 
     private func publishSnapshot() {
-        publish(locked { snapshot })
-    }
-
-    private func locked<T>(_ body: () -> T) -> T {
-        lock.lock()
-        defer { lock.unlock() }
-        return body()
+        publish(state.withLock { $0.snapshot })
     }
 }

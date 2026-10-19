@@ -1,0 +1,89 @@
+name: Release
+
+# Push a tag matching VERSION (e.g. v1.0.0) to build the installer and publish a GitHub release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)build and publish, e.g. v1.0.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish the .pkg
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Select Command Line Tools
+        run: |
+          sudo xcode-select --switch /Library/Developer/CommandLineTools
+          swift --version
+          swift --version 2>&1 | grep -q 'Swift version 6\.4'
+
+      - name: Check the tag matches VERSION
+        run: |
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          test "v$VERSION" = "$TAG" || { echo "Tag $TAG does not match VERSION $VERSION"; exit 1; }
+
+      - name: Cache swift-syntax build
+        uses: actions/cache@v4
+        with:
+          path: Tools/.build
+          key: tools-${{ runner.os }}-${{ hashFiles('Tools/Package.resolved', 'Tools/Package.swift') }}
+
+      - name: Quality gate
+        run: make gate
+
+      - name: Build installer
+        run: make pkg
+
+      - name: Inspect installer
+        run: |
+          PKG="build/macos-processor-monitor-$VERSION.pkg"
+          pkgutil --payload-files "$PKG" | grep -E 'Applications/macOS Processor Monitor.app/Contents/MacOS/ProcessorMonitor$'
+          pkgutil --payload-files "$PKG" | grep -E 'PrivilegedHelperTools/io.github.arrrlo.macos-processor-monitor.helper$'
+          shasum -a 256 "$PKG" | tee "$PKG.sha256"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PKG="build/macos-processor-monitor-$VERSION.pkg"
+          SHA=$(cut -d' ' -f1 < "$PKG.sha256")
+          cat > notes.md <<EOF
+          ## Install
+
+          1. Download **macos-processor-monitor-$VERSION.pkg** below and open it.
+          2. This build is not notarized, so macOS blocks it the first time. Open **System Settings › Privacy & Security**,
+             scroll to the message about the installer and click **Open Anyway**.
+
+          Or install from Terminal, which skips that step:
+
+          \`\`\`sh
+          curl -LO https://github.com/${{ github.repository }}/releases/download/$TAG/macos-processor-monitor-$VERSION.pkg
+          sudo installer -pkg macos-processor-monitor-$VERSION.pkg -target /
+          \`\`\`
+
+          Requires macOS 14 or later on Apple Silicon.
+
+          SHA-256: \`$SHA\`
+          EOF
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$PKG" "$PKG.sha256" --clobber
+          else
+            gh release create "$TAG" "$PKG" "$PKG.sha256" --verify-tag \
+              --title "macOS Processor Monitor $VERSION" --notes-file notes.md
+          fi

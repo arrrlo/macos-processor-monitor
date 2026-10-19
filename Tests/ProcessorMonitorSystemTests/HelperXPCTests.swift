@@ -104,8 +104,8 @@ func awaitValue<T: Sendable>(_ start: (@escaping @Sendable (T) -> Void) -> Void)
         let processes = await awaitValue { client.topProcesses(limit: 10, completion: $0) }
         #expect(processes == [ProcessUsage(pid: 42, name: "fake", cpuPercent: 100)])
         // The reply cancelled the timeout, so expiring it must not tear the connection down.
-        scheduler.advance(by: 2)
         #expect(scheduler.pending.isEmpty)
+        scheduler.advance(by: 2)
         _ = await awaitValue { client.topProcesses(limit: 10, completion: $0) }
         #expect(connections.values.count == 1)
         listener.invalidate()
@@ -127,6 +127,38 @@ func awaitValue<T: Sendable>(_ start: (@escaping @Sendable (T) -> Void) -> Void)
         let second = await awaitValue { client.topProcesses(limit: 10, completion: $0) }
         #expect(second == nil)
         #expect(connections.values.count == 2)
+    }
+
+    @Test func rejectedConnectionFailsAndCancelsTheTimeout() async {
+        let listener = NSXPCListener.anonymous()
+        let delegate = RejectingHelper()
+        listener.delegate = delegate
+        listener.resume()
+        let endpoint = listener.endpoint
+        let scheduler = FakeScheduler()
+        let client = HelperClient(timeout: 2, scheduler: scheduler) { NSXPCConnection(listenerEndpoint: endpoint) }
+        let result = await awaitValue { client.topProcesses(limit: 10, completion: $0) }
+        #expect(result == nil)
+        #expect(scheduler.pending.isEmpty)
+        listener.invalidate()
+    }
+
+    @Test func releasingTheClientClosesItsConnection() async {
+        let listener = NSXPCListener.anonymous()
+        let daemon = makeDaemon(listener)
+        let closed = Recorder<Bool>()
+        let watcher = ConnectionWatcher(daemon: daemon) { closed.append(true) }
+        listener.delegate = watcher
+        listener.resume()
+        let endpoint = listener.endpoint
+        var client: HelperClient? = HelperClient(timeout: 2, scheduler: FakeScheduler()) { NSXPCConnection(listenerEndpoint: endpoint) }
+        _ = await awaitValue { client?.topProcesses(limit: 1, completion: $0) }
+        client = nil
+        for _ in 0..<100 where closed.values.isEmpty {
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        #expect(closed.values == [true])
+        listener.invalidate()
     }
 
     @Test func helperThatNeverRepliesTimesOut() async {
@@ -177,6 +209,12 @@ func awaitValue<T: Sendable>(_ start: (@escaping @Sendable (T) -> Void) -> Void)
         #expect(result == TopProcessesResult(processes: [ProcessUsage(pid: 1, name: "root", cpuPercent: 3)], scope: .allProcesses))
     }
 
+    @Test func liveSamplerMeasuresAQuarterSecondWindow() {
+        let start = Date()
+        _ = ProcessUsageSampler.live().top(limit: 1)
+        #expect(Date().timeIntervalSince(start) >= 0.2)
+    }
+
     @Test func fallsBackToTheCurrentUsersProcesses() async {
         let service = TopProcessesService(helper: { _, completion in completion(nil) }, local: ProcessUsageSampler.live())
         let result = await awaitValue { service.topProcesses(limit: 5, completion: $0) }
@@ -191,6 +229,29 @@ func awaitValue<T: Sendable>(_ start: (@escaping @Sendable (T) -> Void) -> Void)
 }
 
 @Suite(.timeLimit(.minutes(1))) struct DispatchSchedulerTests {
+    @Test func leewayIsAFractionOfTheDelay() {
+        #expect(DispatchScheduler.leeway(for: 2, fraction: 0.2) == .nanoseconds(400_000_000))
+        #expect(DispatchScheduler.leeway(for: 0.5, fraction: 0.1) == .nanoseconds(50_000_000))
+    }
+
+    @Test func oneShotWaitsForItsDelay() async {
+        let scheduler = DispatchScheduler(queue: DispatchQueue(label: "test"), leewayFraction: 0)
+        let fired = Recorder<Bool>()
+        let task = scheduler.schedule(after: 0.3) { fired.append(true) }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        #expect(fired.values.isEmpty)
+        task.cancel()
+    }
+
+    @Test func repeatingWaitsOneIntervalBeforeTheFirstTick() async {
+        let scheduler = DispatchScheduler(queue: DispatchQueue(label: "test"), leewayFraction: 0)
+        let fired = Recorder<Bool>()
+        let task = scheduler.scheduleRepeating(every: 0.3) { fired.append(true) }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        #expect(fired.values.isEmpty)
+        task.cancel()
+    }
+
     @Test func oneShotFiresOnce() async {
         let scheduler = DispatchScheduler(queue: DispatchQueue(label: "test"))
         let fired = Recorder<Bool>()
@@ -222,6 +283,29 @@ func awaitValue<T: Sendable>(_ start: (@escaping @Sendable (T) -> Void) -> Void)
         scheduler.schedule(after: 0.01) { fired.append(true) }.cancel()
         try? await Task.sleep(nanoseconds: 50_000_000)
         #expect(fired.values.isEmpty)
+    }
+}
+
+/// Refuses every connection.
+final class RejectingHelper: NSObject, NSXPCListenerDelegate {
+    func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
+        false
+    }
+}
+
+/// Lets the daemon serve the connection and reports when the client side goes away.
+final class ConnectionWatcher: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
+    let daemon: HelperDaemon
+    let onClose: @Sendable () -> Void
+
+    init(daemon: HelperDaemon, onClose: @escaping @Sendable () -> Void) {
+        self.daemon = daemon
+        self.onClose = onClose
+    }
+
+    func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
+        connection.invalidationHandler = onClose
+        return daemon.listener(listener, shouldAcceptNewConnection: connection)
     }
 }
 

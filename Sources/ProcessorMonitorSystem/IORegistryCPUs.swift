@@ -2,29 +2,51 @@ import Foundation
 import IOKit
 import ProcessorMonitorCore
 
+/// The IOKit registry calls the traversal needs, so tests can check every object is released.
+struct RegistryAccess: Sendable {
+    let entry: @Sendable (String) -> io_registry_entry_t
+    let childIterator: @Sendable (io_registry_entry_t) -> io_iterator_t
+    let next: @Sendable (io_iterator_t) -> io_object_t
+    let properties: @Sendable (io_registry_entry_t) -> [String: Any]?
+    let release: @Sendable (io_object_t) -> Void
+
+    static let live = RegistryAccess(
+        entry: { IORegistryEntryFromPath(kIOMainPortDefault, $0) },
+        childIterator: { entry in
+            var iterator: io_iterator_t = 0
+            IORegistryEntryGetChildIterator(entry, kIODeviceTreePlane, &iterator)
+            return iterator
+        },
+        next: { IOIteratorNext($0) },
+        properties: { object in
+            var properties: Unmanaged<CFMutableDictionary>?
+            IORegistryEntryCreateCFProperties(object, &properties, kCFAllocatorDefault, 0)
+            return properties?.takeRetainedValue() as? [String: Any]
+        },
+        release: { IOObjectRelease($0) }
+    )
+}
+
 /// Reads `IODeviceTree:/cpus/cpuN` — the only reliable source for which logical CPU belongs to which cluster.
 public enum IORegistryCPUs {
     public static func read() -> [CPUDescriptor] {
         childProperties(path: "IODeviceTree:/cpus").compactMap(RegistryCPUParser.descriptor)
     }
 
-    static func childProperties(path: String) -> [[String: Any]] {
-        let entry = IORegistryEntryFromPath(kIOMainPortDefault, path)
+    static func childProperties(path: String, access: RegistryAccess = .live) -> [[String: Any]] {
+        let entry = access.entry(path)
         guard entry != 0 else { return [] }
-        defer { IOObjectRelease(entry) }
-        var iterator: io_iterator_t = 0
-        IORegistryEntryGetChildIterator(entry, kIODeviceTreePlane, &iterator)
-        defer { IOObjectRelease(iterator) }
+        defer { access.release(entry) }
+        let iterator = access.childIterator(entry)
+        defer { access.release(iterator) }
         var result: [[String: Any]] = []
-        var child = IOIteratorNext(iterator)
+        var child = access.next(iterator)
         while child != 0 {
-            var properties: Unmanaged<CFMutableDictionary>?
-            IORegistryEntryCreateCFProperties(child, &properties, kCFAllocatorDefault, 0)
-            if let dictionary = properties?.takeRetainedValue() as? [String: Any] {
-                result.append(dictionary)
+            if let properties = access.properties(child) {
+                result.append(properties)
             }
-            IOObjectRelease(child)
-            child = IOIteratorNext(iterator)
+            access.release(child)
+            child = access.next(iterator)
         }
         return result
     }

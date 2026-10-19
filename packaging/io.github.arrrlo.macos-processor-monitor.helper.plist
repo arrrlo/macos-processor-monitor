@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Root helper that measures every process's CPU usage. launchd starts it on the first
+	     XPC message (no RunAtLoad, no KeepAlive); it exits after 30 s without requests. -->
+	<key>Label</key>
+	<string>io.github.arrrlo.macos-processor-monitor.helper</string>
+	<key>Program</key>
+	<string>/Library/PrivilegedHelperTools/io.github.arrrlo.macos-processor-monitor.helper</string>
+	<key>MachServices</key>
+	<dict>
+		<key>io.github.arrrlo.macos-processor-monitor.helper</key>
+		<true/>
+	</dict>
+	<key>ProcessType</key>
+	<string>Adaptive</string>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>io.github.arrrlo.macos-processor-monitor</string>
+	</array>
+</dict>
+</plist>

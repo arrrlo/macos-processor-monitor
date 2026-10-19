@@ -1,0 +1,13 @@
+#!/bin/sh
+# Stops a previously installed version before its files are replaced.
+LABEL=io.github.arrrlo.macos-processor-monitor
+
+launchctl bootout "system/$LABEL.helper" 2>/dev/null
+
+CONSOLE_USER=$(stat -f %Su /dev/console)
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ]; then
+    launchctl bootout "gui/$(id -u "$CONSOLE_USER")/$LABEL" 2>/dev/null
+fi
+
+pkill -x ProcessorMonitor 2>/dev/null
+exit 0

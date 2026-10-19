@@ -1,4 +1,5 @@
 import Foundation
+import IOKit
 import Testing
 @testable import ProcessorMonitorCore
 @testable import ProcessorMonitorSystem
@@ -83,9 +84,62 @@ import Testing
     }
 }
 
-@Suite struct IORegistryTraversalTests {
+/// Hands out numbered objects and tracks which are still unreleased.
+final class FakeRegistry: @unchecked Sendable {
+    private(set) var outstanding: Set<io_object_t> = []
+    private var nextObject: io_object_t = 100
+    var childCount = 2
+
+    func make() -> io_object_t {
+        nextObject += 1
+        outstanding.insert(nextObject)
+        return nextObject
+    }
+
+    var access: RegistryAccess {
+        RegistryAccess(
+            entry: { _ in self.make() },
+            childIterator: { _ in self.make() },
+            next: { _ in
+                guard self.childCount > 0 else { return 0 }
+                self.childCount -= 1
+                return self.make()
+            },
+            properties: { object in ["object": NSNumber(value: object)] },
+            release: { self.outstanding.remove($0) }
+        )
+    }
+}
+
+/// Serialized: iterating the root takes references on its children, which the retain-count tests measure.
+@Suite(.serialized) struct IORegistryTraversalTests {
     /// The device tree root always has children, even in VMs, so the traversal loop is exercised everywhere.
     @Test func listsChildrenOfTheDeviceTreeRoot() {
         #expect(!IORegistryCPUs.childProperties(path: "IODeviceTree:/").isEmpty)
+    }
+
+    @Test func releasesEveryObjectItObtains() {
+        let registry = FakeRegistry()
+        let children = IORegistryCPUs.childProperties(path: "any", access: registry.access)
+        #expect(children.count == 2)
+        #expect(registry.outstanding.isEmpty)
+    }
+
+    // Retain counts are per registry entry, so each live test uses a node no other test touches.
+    @Test func liveReleaseDropsAReference() {
+        let entry = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/options")
+        let extra = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/options")
+        let before = IOObjectGetUserRetainCount(entry)
+        RegistryAccess.live.release(extra)
+        #expect(IOObjectGetUserRetainCount(entry) == before - 1)
+        IOObjectRelease(entry)
+    }
+
+    @Test func liveTraversalLeavesNoReferencesBehind() {
+        let entry = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/chosen")
+        let before = IOObjectGetUserRetainCount(entry)
+        _ = IORegistryCPUs.childProperties(path: "IODeviceTree:/chosen")
+        #expect(IOObjectGetUserRetainCount(entry) == before)
+        IOObjectRelease(entry)
     }
 }

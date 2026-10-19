@@ -47,6 +47,16 @@ final class DeallocationLog: @unchecked Sendable {
         #expect(log.calls.first?.size == vm_size_t(values.count * MemoryLayout<integer_t>.stride))
     }
 
+    @Test func liveDeallocationUnmapsTheKernelBuffer() throws {
+        let live = CPUTicksReader.Source.live
+        let result = live.query()
+        let info = try #require(result.info)
+        let address = vm_address_t(bitPattern: info)
+        #expect(isMapped(address))
+        live.deallocate(address, vm_size_t(result.infoCount) * vm_size_t(MemoryLayout<integer_t>.stride))
+        #expect(!isMapped(address))
+    }
+
     @Test func failedQueryReturnsNilWithoutDeallocating() {
         let log = DeallocationLog()
         let source = CPUTicksReader.Source(query: { (KERN_FAILURE, 0, nil, 0) }, deallocate: { log.calls.append(($0, $1)) })
@@ -58,4 +68,19 @@ final class DeallocationLog: @unchecked Sendable {
         let source = CPUTicksReader.Source(query: { (KERN_SUCCESS, 1, nil, 0) }, deallocate: { _, _ in })
         #expect(CPUTicksReader(source: source).read() == nil)
     }
+}
+
+/// Whether `address` lies inside a mapped region of this task.
+func isMapped(_ address: vm_address_t) -> Bool {
+    var regionStart = mach_vm_address_t(address)
+    var regionSize: mach_vm_size_t = 0
+    var info = vm_region_basic_info_data_64_t()
+    var count = mach_msg_type_number_t(MemoryLayout<vm_region_basic_info_data_64_t>.size / MemoryLayout<Int32>.size)
+    var object: mach_port_t = 0
+    let status = withUnsafeMutablePointer(to: &info) { pointer in
+        pointer.withMemoryRebound(to: Int32.self, capacity: Int(count)) {
+            mach_vm_region(mach_task_self_, &regionStart, &regionSize, VM_REGION_BASIC_INFO_64, $0, &count, &object)
+        }
+    }
+    return status == KERN_SUCCESS && regionStart <= mach_vm_address_t(address)
 }

@@ -6,8 +6,8 @@ import SwiftUI
 @MainActor
 public final class DashboardWindowController: NSObject, NSWindowDelegate {
     private(set) var window: NSWindow?
-    private var host: NSHostingView<DashboardView>?
-    private var model = DashboardModel(snapshot: .empty, clusterNames: [], apps: [:])
+    private var host: NSHostingController<DashboardView>?
+    private(set) var model = DashboardModel(snapshot: .empty, clusterNames: [], apps: [:])
     private let onVisibilityChanged: (Bool) -> Void
     public private(set) var isVisible = false
 
@@ -27,15 +27,11 @@ public final class DashboardWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
-        let host = NSHostingView(rootView: DashboardView(model: model))
-        let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: host.fittingSize),
-            styleMask: [.titled, .closable, .miniaturizable],
-            backing: .buffered,
-            defer: false
-        )
+        let host = NSHostingController(rootView: DashboardView(model: model))
+        let window = NSWindow(contentViewController: host)
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.setContentSize(host.view.fittingSize)
         window.title = "macOS Processor Monitor"
-        window.contentView = host
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.center()

@@ -1,0 +1,27 @@
+#!/bin/sh
+# Registers the on-demand helper daemon and the login agent, then starts the app for the
+# logged-in user. Remote/MDM installs without a GUI session skip the user part; the agent
+# starts the app at that user's next login.
+LABEL=io.github.arrrlo.macos-processor-monitor
+HELPER=/Library/PrivilegedHelperTools/$LABEL.helper
+DAEMON=/Library/LaunchDaemons/$LABEL.helper.plist
+AGENT=/Library/LaunchAgents/$LABEL.plist
+
+# A root daemon's binary and plist must not be writable by anyone else.
+chown root:wheel "$HELPER" "$DAEMON" "$AGENT"
+chmod 755 "$HELPER"
+chmod 644 "$DAEMON" "$AGENT"
+
+launchctl bootstrap system "$DAEMON"
+
+CONSOLE_USER=$(stat -f %Su /dev/console)
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ] && [ "$CONSOLE_USER" != "loginwindow" ]; then
+    CONSOLE_UID=$(id -u "$CONSOLE_USER")
+    # RunAtLoad starts the app now, unless the user turned Launch at Login off earlier;
+    # an upgrade keeps that choice and simply opens the app once.
+    launchctl bootstrap "gui/$CONSOLE_UID" "$AGENT" 2>/dev/null
+    if launchctl print-disabled "gui/$CONSOLE_UID" | grep -q "\"$LABEL\" => disabled"; then
+        launchctl asuser "$CONSOLE_UID" sudo -u "$CONSOLE_USER" open -a "/Applications/macOS Processor Monitor.app"
+    fi
+fi
+exit 0

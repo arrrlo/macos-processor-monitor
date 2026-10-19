@@ -1,0 +1,28 @@
+name: Mutation testing
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  mutate:
+    name: Every mutant must be killed
+    runs-on: macos-26
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Command Line Tools
+        run: |
+          sudo xcode-select --switch /Library/Developer/CommandLineTools
+          swift --version 2>&1 | grep -q 'Swift version 6\.4'
+
+      - name: App package
+        run: make mutate MUTATION_JOBS=2
+
+      - name: Tools package
+        run: make tools-mutate MUTATION_JOBS=2

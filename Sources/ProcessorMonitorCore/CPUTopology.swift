@@ -67,6 +67,7 @@ public struct CPUTopology: Equatable, Sendable {
         let known = ["P", "M", "E"]
         let lhsRank = known.firstIndex(of: lhs) ?? known.count
         let rhsRank = known.firstIndex(of: rhs) ?? known.count
+        // mutation:disable-next-line dictionary keys are unique, so the comparator never sees ties and `<=` sorts identically
         return (lhsRank, lhs) < (rhsRank, rhs)
     }
 

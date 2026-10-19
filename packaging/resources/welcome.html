@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 13px -apple-system, sans-serif; line-height: 1.45; }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h2>macOS Processor Monitor</h2>
+<p>A lightweight menu bar monitor for Apple Silicon processors. It shows processor load and
+temperature in the menu bar, and the full picture in its menu and dashboard:</p>
+<ul>
+  <li>overall load with the user / system / idle split</li>
+  <li>occupancy of every core, grouped by core cluster</li>
+  <li>processor temperature</li>
+  <li>the 10 processes using the most processor time</li>
+</ul>
+<p>This installs:</p>
+<ul>
+  <li><b>macOS Processor Monitor.app</b> in Applications</li>
+  <li>a small helper that measures every process's CPU usage (macOS only shows other users'
+      processes to administrators). It is read-only, starts only while the menu or dashboard is
+      open, and quits 30 seconds after.</li>
+  <li>a login item, so the monitor starts when you log in. You can turn it off from the menu.</li>
+</ul>
+</body>
+</html>

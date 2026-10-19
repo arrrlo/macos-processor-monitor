@@ -61,6 +61,7 @@ extension AppKitTests {
         @Test func startShowsReadingsInTheStatusItem() async throws {
             let harness = makeHarness()
             harness.controller.start()
+            #expect(harness.controller.isRunning)
             await settle()
             let button = try #require(harness.controller.statusItem.item.button)
             #expect(button.title == "—  49°C")
@@ -68,6 +69,8 @@ extension AppKitTests {
             await settle()
             #expect(button.title == "25%  49°C")
             harness.controller.stop()
+            #expect(!harness.controller.isRunning)
+            #expect(button.window?.isVisible == false)
         }
 
         @Test func openingTheMenuRequestsProcessesAndFillsIt() async {
@@ -108,9 +111,11 @@ extension AppKitTests {
 
             let submenu = try #require(menu.items[21].submenu)
             #expect(submenu.items[1].state == .on)
+            #expect(harness.scheduler.pending.map(\.interval) == [2])
             submenu.performActionForItem(at: 0)
             #expect(harness.settings.refreshInterval == .one)
             #expect(submenu.items[0].state == .on)
+            #expect(harness.scheduler.pending.map(\.interval) == [1])
 
             menu.performActionForItem(at: 22)
             #expect(harness.loginItem.changes == [false])
@@ -125,13 +130,20 @@ extension AppKitTests {
         @Test func dashboardShowsDataAndCreatesDemandWhileVisible() async throws {
             let harness = makeHarness()
             harness.controller.start()
+            await settle()
             harness.controller.menu.menu.performActionForItem(at: 20)
             #expect(harness.log.entries == ["activate"])
             let window = try #require(harness.controller.dashboard.window)
+            // Opening shows the latest reading at once, without waiting for a tick.
+            #expect(harness.controller.dashboard.model.snapshot.temperature?.average == 48.6)
+            #expect(harness.controller.dashboard.model.clusterNames == ["Super", "Performance"])
             #expect(harness.sources.processes.requests == [10])
             harness.sources.processes.complete(with: MonitorSnapshot.sample.topProcesses!)
+            await settle()
+            #expect(harness.controller.dashboard.model.snapshot.topProcesses == MonitorSnapshot.sample.topProcesses)
             harness.scheduler.advance(by: 2)
             await settle()
+            #expect(harness.controller.dashboard.model.snapshot.load?.overall.total == 0.25)
             window.close()
             harness.scheduler.advance(by: 2)
             #expect(harness.sources.processes.requests.count == 2)
@@ -175,8 +187,9 @@ extension AppKitTests {
             )
             delegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
             #expect(made == 1)
-            #expect(delegate.controller != nil)
+            #expect(delegate.controller?.isRunning == true)
             delegate.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
+            #expect(delegate.controller?.isRunning == false)
             #expect(terminated == 0)
         }
 

@@ -162,10 +162,15 @@ final class Published: @unchecked Sendable {
 
     @Test func startTwiceAndStopTwiceAreHarmless() {
         let scheduler = FakeScheduler()
-        let engine = makeEngine(FakeSources(), scheduler, published: Published())
+        let sources = FakeSources()
+        let published = Published()
+        let engine = makeEngine(sources, scheduler, published: published)
         engine.start()
         engine.start()
         #expect(scheduler.pending.count == 1)
+        #expect(sources.tickReads == 1)
+        #expect(sources.temperatureReads == 1)
+        #expect(published.snapshots.count == 1)
         engine.stop()
         engine.stop()
         #expect(scheduler.pending.isEmpty)

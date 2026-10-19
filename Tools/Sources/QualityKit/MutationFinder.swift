@@ -132,10 +132,25 @@ private final class MutationCollector: SyntaxVisitor {
     }
 
     override func visit(_ node: CodeBlockItemSyntax) -> SyntaxVisitorContinueKind {
-        if let call = node.item.as(FunctionCallExprSyntax.self) {
+        if let call = node.item.as(FunctionCallExprSyntax.self), !Self.isInitializerChain(ExprSyntax(call)) {
             add(call, replacement: "", name: "removeCall")
         }
         return .visitChildren
+    }
+
+    /// `Text("a").font(.headline)`, `Card(model: m)`: with warnings as errors, an unused initializer
+    /// result can only be a result-builder component (a SwiftUI view), not a discarded side effect.
+    private static func isInitializerChain(_ expression: ExprSyntax) -> Bool {
+        if let call = expression.as(FunctionCallExprSyntax.self) {
+            if let reference = call.calledExpression.as(DeclReferenceExprSyntax.self) {
+                return reference.baseName.text.first?.isUppercase == true
+            }
+            return isInitializerChain(call.calledExpression)
+        }
+        if let member = expression.as(MemberAccessExprSyntax.self), let base = member.base, base.is(FunctionCallExprSyntax.self) {
+            return isInitializerChain(base)
+        }
+        return false
     }
 
     private func add(_ node: some SyntaxProtocol, replacement: String, name: String) {

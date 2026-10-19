@@ -127,6 +127,18 @@ final class FakeProcessTable: @unchecked Sendable {
         #expect(top == [ProcessUsage(pid: 7, name: "p", cpuPercent: 100)])
     }
 
+    @Test func baselineExactlyOneWindowOldIsUsedWithoutWaiting() {
+        let table = FakeProcessTable([
+            snapshot(at: 1_000, cpu: 0), snapshot(at: 1_250, cpu: 0),
+            snapshot(at: 1_500, cpu: 250),
+        ])
+        let sut = sampler(table)
+        _ = sut.top(limit: 10)
+        #expect(sut.top(limit: 10) == [ProcessUsage(pid: 7, name: "p", cpuPercent: 100)])
+        #expect(table.sleeps == [250])
+        #expect(table.taken == 3)
+    }
+
     @Test func staleBaselineIsDiscarded() {
         let table = FakeProcessTable([
             snapshot(at: 1_000, cpu: 0), snapshot(at: 1_250, cpu: 0),

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Tests, 100% coverage, CRAP ≤ 16
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # The project builds with the Command Line Tools toolchain (Swift 6.4), not the image's
+      # default Xcode, so coverage and diagnostics match local runs exactly.
+      - name: Select Command Line Tools
+        run: |
+          sudo xcode-select --switch /Library/Developer/CommandLineTools
+          swift --version
+          swift --version 2>&1 | grep -q 'Swift version 6\.4'
+
+      - name: Cache swift-syntax build
+        uses: actions/cache@v4
+        with:
+          path: Tools/.build
+          key: tools-${{ runner.os }}-${{ hashFiles('Tools/Package.resolved', 'Tools/Package.swift') }}
+
+      - name: Quality gate
+        run: make gate

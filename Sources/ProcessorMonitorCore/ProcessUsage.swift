@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Converts Mach absolute time units to nanoseconds (`mach_timebase_info`; 125/3 on Apple Silicon).
 public struct Timebase: Equatable, Sendable {
@@ -67,7 +68,8 @@ public enum ProcessCPUCalculator {
         }
         return current.processes.compactMap { process in
             guard let earlier = before[ProcessKey(process)] else { return nil }
-            let used = process.cpuTime > earlier ? process.cpuTime - earlier : 0
+            // A counter that went backwards (should not happen) counts as no usage.
+            let used = max(process.cpuTime, earlier) - earlier
             return ProcessUsage(pid: process.pid, name: process.name, cpuPercent: timebase.nanoseconds(used) / elapsed * 100)
         }
     }
@@ -85,6 +87,7 @@ private struct ProcessKey: Hashable {
 
 public enum TopProcesses {
     public static func select(_ usage: [ProcessUsage], limit: Int) -> [ProcessUsage] {
+        // mutation:disable-next-line PIDs are unique, so two entries never compare equal and `<=` sorts identically
         let ranked = usage.sorted { ($1.cpuPercent, $0.pid) < ($0.cpuPercent, $1.pid) }
         return Array(ranked.prefix(max(limit, 0)))
     }
@@ -93,14 +96,13 @@ public enum TopProcesses {
 /// Answers "top N right now" with as little sampling as possible: it measures against the
 /// snapshot taken by the previous request when that is recent, and otherwise takes a short
 /// measurement window. Safe to call from any thread; calls are serialized.
-public final class ProcessUsageSampler: @unchecked Sendable {
+public final class ProcessUsageSampler: Sendable {
     private let timebase: Timebase
     private let minimumWindow: UInt64
     private let maximumBaselineAge: UInt64
     private let snapshot: @Sendable () -> ProcessSnapshot
     private let sleep: @Sendable (UInt64) -> Void
-    private let lock = NSLock()
-    private var baseline: ProcessSnapshot?
+    private let baseline = OSAllocatedUnfairLock<ProcessSnapshot?>(initialState: nil)
 
     /// - Parameters:
     ///   - minimumWindow: shortest measurement interval, ns.
@@ -120,19 +122,19 @@ public final class ProcessUsageSampler: @unchecked Sendable {
     }
 
     public func top(limit: Int) -> [ProcessUsage] {
-        lock.lock()
-        defer { lock.unlock() }
-        var current = snapshot()
-        var previous = current
-        if let baseline, current.timestamp - baseline.timestamp <= maximumBaselineAge {
-            previous = baseline
+        baseline.withLock { baseline in
+            var current = snapshot()
+            var previous = current
+            if let stored = baseline, current.timestamp - stored.timestamp <= maximumBaselineAge {
+                previous = stored
+            }
+            let elapsed = current.timestamp - previous.timestamp
+            if elapsed < minimumWindow {
+                sleep(minimumWindow - elapsed)
+                current = snapshot()
+            }
+            baseline = current
+            return TopProcesses.select(ProcessCPUCalculator.usage(previous: previous, current: current, timebase: timebase), limit: limit)
         }
-        let elapsed = current.timestamp - previous.timestamp
-        if elapsed < minimumWindow {
-            sleep(minimumWindow - elapsed)
-            current = snapshot()
-        }
-        baseline = current
-        return TopProcesses.select(ProcessCPUCalculator.usage(previous: previous, current: current, timebase: timebase), limit: limit)
     }
 }
