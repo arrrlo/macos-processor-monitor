@@ -55,7 +55,8 @@ jobs:
           PKG="build/macos-processor-monitor-$VERSION.pkg"
           pkgutil --payload-files "$PKG" | grep -E 'Applications/macOS Processor Monitor.app/Contents/MacOS/ProcessorMonitor$'
           pkgutil --payload-files "$PKG" | grep -E 'PrivilegedHelperTools/io.github.arrrlo.macos-processor-monitor.helper$'
-          shasum -a 256 "$PKG" | tee "$PKG.sha256"
+          # Name only (no build/ prefix), so `shasum -a 256 -c` works next to the downloaded file.
+          (cd build && shasum -a 256 "macos-processor-monitor-$VERSION.pkg") | tee "$PKG.sha256"
 
       - name: Publish release
         env:
@@ -83,6 +84,7 @@ jobs:
           EOF
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" "$PKG" "$PKG.sha256" --clobber
+            gh release edit "$TAG" --notes-file notes.md
           else
             gh release create "$TAG" "$PKG" "$PKG.sha256" --verify-tag \
               --title "macOS Processor Monitor $VERSION" --notes-file notes.md
