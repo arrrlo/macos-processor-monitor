@@ -3,6 +3,8 @@ public enum CommandLineTool {
     public static let usage = """
     usage: pmtools coverage --json <codecov.json> --sources <dir> [--exclude <relative path>]...
            pmtools crap --json <codecov.json> --sources <dir> [--exclude <relative path>]... [--max 16]
+           pmtools mutate --package <dir> --build <command> --test <command> [--jobs 4]
+                          [--exclude <package-relative path>]... [--file <package-relative path>]... [--changed <git ref>]
     """
 
     public static func run(_ arguments: [String], environment: ToolEnvironment) -> Int32 {
@@ -13,6 +15,8 @@ public enum CommandLineTool {
                 return try runCoverage(list, environment: environment)
             case "crap":
                 return try runCrap(list, environment: environment)
+            case "mutate":
+                return try runMutate(list, environment: environment)
             default:
                 environment.output("error: unknown subcommand '\(list.subcommand)'")
                 environment.output(usage)
@@ -74,5 +78,45 @@ public enum CommandLineTool {
             report.lines(limit: 5).forEach { environment.output("  \($0)") }
         }
         return 0
+    }
+
+    private static func runMutate(_ list: ArgumentList, environment: ToolEnvironment) throws -> Int32 {
+        let package = try list.value(for: "package")
+        let configuration = MutationConfiguration(
+            packageDirectory: package,
+            buildCommand: try list.value(for: "build"),
+            testCommand: try list.value(for: "test"),
+            jobs: try list.intValue(for: "jobs", default: 4),
+            timeoutFactor: 3,
+            minimumTimeout: 60
+        )
+        let root = SourceRoot(package)
+        let files = try mutationFiles(list, root: root, environment: environment)
+        var mutants: [Mutant] = []
+        for file in files {
+            let scan = MutationFinder.scan(String(decoding: try environment.readFile(file), as: UTF8.self), file: file)
+            scan.warnings.forEach { environment.output("warning: \($0)") }
+            mutants += scan.mutants
+        }
+        environment.output("Found \(mutants.count) mutants in \(files.count) files")
+        let report = MutationReport(results: try MutationRunner(configuration: configuration, environment: environment).run(mutants), root: root)
+        report.lines.forEach(environment.output)
+        return report.passed ? 0 : 1
+    }
+
+    /// Swift files under Sources/, minus `--exclude`, limited to `--file` and to files changed since `--changed`.
+    private static func mutationFiles(_ list: ArgumentList, root: SourceRoot, environment: ToolEnvironment) throws -> [String] {
+        let excluded = Set(list.values(for: "exclude"))
+        var files = try environment.swiftFiles(root.path + "/Sources").filter { !excluded.contains(root.display($0)) }
+        let only = Set(list.values(for: "file"))
+        if !only.isEmpty {
+            files = files.filter { only.contains(root.display($0)) }
+        }
+        if let reference = list.optionalValue(for: "changed") {
+            let diff = environment.runner.run("git diff --name-only \(MutationRunner.quote(reference)) -- Sources", in: root.path, timeout: 60)
+            let changed = Set(diff.output.split(separator: "\n").map(String.init))
+            files = files.filter { changed.contains(root.display($0)) }
+        }
+        return files
     }
 }

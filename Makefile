@@ -22,9 +22,11 @@ APP_COVERAGE := .build/coverage.json
 TOOLS_COVERAGE := $(TOOLS)/.build/coverage.json
 MAX_CRAP := 16
 FILTER ?=
+MUTATION_JOBS ?= 6
+MUTATION_EXCLUDES := --exclude Sources/ProcessorMonitor/main.swift --exclude Sources/ProcessorMonitorHelper/main.swift
 
-.PHONY: help build test coverage crap gate tools-build tools-test tools-coverage tools-crap tools-gate \
-        mutate mutate-changed app pkg run clean
+.PHONY: help build test coverage crap gate mutate tools-build tools-test tools-coverage tools-crap tools-gate \
+        tools-mutate app pkg run clean
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-16s %s\n", $$1, $$2}'
@@ -47,6 +49,12 @@ crap: tools-build ## CRAP <= 16 for every app function (uses the JSON from `make
 
 gate: build coverage crap tools-gate ## Full quality gate for both packages
 
+mutate: tools-build ## Mutation testing (CHANGED=<git ref> or FILE=Sources/... to narrow); any survivor fails
+	"$(PMTOOLS)" mutate --package "$(CURDIR)" --jobs $(MUTATION_JOBS) $(MUTATION_EXCLUDES) \
+		--build 'swift build --build-tests -j 3 $(SWIFT_FLAGS) $(STRICT_FLAGS)' \
+		--test 'swift test --skip-build $(TEST_FLAGS) $(STRICT_FLAGS)' \
+		$(if $(CHANGED),--changed '$(CHANGED)') $(if $(FILE),--file '$(FILE)')
+
 # ---- Tools package -----------------------------------------------------------------------
 
 tools-build: ## Build pmtools (coverage / crap / mutate)
@@ -64,3 +72,9 @@ tools-crap: tools-build
 	"$(PMTOOLS)" crap --json $(TOOLS_COVERAGE) --sources "$(CURDIR)/$(TOOLS)/Sources" $(TOOLS_EXCLUDES) --max $(MAX_CRAP)
 
 tools-gate: tools-coverage tools-crap ## Quality gate for the Tools package
+
+tools-mutate: tools-build ## Mutation testing of the Tools package
+	"$(PMTOOLS)" mutate --package "$(CURDIR)/$(TOOLS)" --jobs $(MUTATION_JOBS) --exclude Sources/pmtools/main.swift \
+		--build 'swift build --build-tests -j 3 $(SWIFT_FLAGS)' \
+		--test 'swift test --skip-build $(TEST_FLAGS)' \
+		$(if $(FILE),--file '$(FILE)')

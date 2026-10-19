@@ -18,7 +18,11 @@ final class FakeEnvironment: @unchecked Sendable {
                 guard let files = self.directories[directory] else { throw CocoaError(.fileNoSuchFile) }
                 return files
             },
-            output: { self.lines.append($0) }
+            output: { self.lines.append($0) },
+            writeFile: { _, _ in },
+            runner: FakeRunner(world: FakeMutationWorld()),
+            temporaryDirectory: "/tmp",
+            now: { 0 }
         )
     }
 }
@@ -135,6 +139,11 @@ final class FakeEnvironment: @unchecked Sendable {
         let files = try live.swiftFiles(root.path)
         #expect(files == [nested.appendingPathComponent("deep.swift").path, root.appendingPathComponent("top.swift").path].sorted())
         #expect(try live.readFile(root.appendingPathComponent("top.swift").path) == Data("x".utf8))
+        try live.writeFile(root.appendingPathComponent("top.swift").path, Data("w".utf8))
+        #expect(try live.readFile(root.appendingPathComponent("top.swift").path) == Data("w".utf8))
+        #expect(live.runner.run("echo ok", in: root.path, timeout: 10).output == "ok\n")
+        #expect(!live.temporaryDirectory.hasSuffix("/"))
+        #expect(live.now() > 0)
         live.output("live output smoke test")
     }
 
