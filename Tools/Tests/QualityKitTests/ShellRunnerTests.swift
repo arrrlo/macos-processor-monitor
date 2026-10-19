@@ -29,6 +29,7 @@ import Testing
     @Test func reportsSpawnFailures() {
         let result = ShellRunner().run("true", in: "/no/such/directory", timeout: 10)
         #expect(result.status == -1)
+        #expect(!result.timedOut)
         #expect(result.output.hasPrefix("could not start: "))
     }
 

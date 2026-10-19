@@ -65,7 +65,7 @@ final class FakeEnvironment: @unchecked Sendable {
 }
 
 @Suite struct CommandLineToolTests {
-    let fullyCovered = CoverageFixtures.json(files: [.init(name: "/p/Sources/A/a.swift")])
+    let fullyCovered = CoverageFixtures.json(files: [.init(name: "/p/Sources/A/a.swift"), .init(name: "/p/Sources/A/b.swift")])
 
     @Test func printsUsageForBadArguments() {
         let fake = FakeEnvironment()
@@ -82,13 +82,13 @@ final class FakeEnvironment: @unchecked Sendable {
     @Test func coveragePassesAndSummarises() {
         let fake = FakeEnvironment()
         fake.files["c.json"] = fullyCovered
-        fake.directories["/p/Sources"] = ["/p/Sources/A/a.swift", "/p/Sources/App/main.swift"]
+        fake.directories["/p/Sources"] = ["/p/Sources/A/a.swift", "/p/Sources/A/b.swift", "/p/Sources/App/main.swift"]
         let status = CommandLineTool.run(
             ["coverage", "--json", "c.json", "--sources", "/p/Sources", "--exclude", "App/main.swift"],
             environment: fake.environment
         )
         #expect(status == 0)
-        #expect(fake.lines == ["Coverage gate: PASS (1 files, 100% lines/functions/regions)"])
+        #expect(fake.lines == ["Coverage gate: PASS (2 files, 100% lines/functions/regions)"])
     }
 
     @Test func coverageFailsAndListsProblems() {

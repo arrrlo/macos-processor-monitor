@@ -72,6 +72,7 @@ private struct Location: Hashable, Comparable, CustomStringConvertible {
     }
 
     static func < (lhs: Location, rhs: Location) -> Bool {
+        // mutation:disable-next-line locations come from a Set, so the sort never compares equal ones
         (lhs.file, lhs.line, lhs.column) < (rhs.file, rhs.line, rhs.column)
     }
 

@@ -63,6 +63,11 @@ import Testing
         #expect(MutationFinder.scan(source, file: "f").warnings.isEmpty)
     }
 
+    @Test func suppressionCountsEmptyLines() {
+        let source = "\n\n// mutation:disable-next-line reason\nlet a = x < y\nlet b = x == y"
+        #expect(mutants(source) == ["5:11 relational == -> !="])
+    }
+
     @Test func suppressionWithoutReasonIsIgnoredWithAWarning() {
         let scan = MutationFinder.scan("let z = 1 // mutation:disable-next-line\nlet a = x == y", file: "/p/a.swift")
         #expect(scan.mutants.count == 1)
@@ -96,8 +101,16 @@ import Testing
         #expect(long.describe(root: SourceRoot("/p")) == "a.swift:2:1 removeCall `someObject.doSomethingVeryLong(with: argument, and: an…` → ``")
     }
 
+    @Test func shortensOnlyTextLongerThanFiftyFourCharacters() {
+        let exact = String(repeating: "x", count: 54)
+        let mutant = Mutant(file: "/p/a.swift", line: 1, column: 1, utf8Range: 0..<1, original: exact, replacement: "", operatorName: "removeCall")
+        #expect(mutant.describe(root: SourceRoot("/p")) == "a.swift:1:1 removeCall `\(exact)` → ``")
+    }
+
     @Test func testFilterIsTheSourceTargetsTestTarget() {
         #expect(mutant.testFilter(packageRoot: SourceRoot("/p")) == "ATests")
+        let topLevel = Mutant(file: "/p/Sources/a.swift", line: 1, column: 1, utf8Range: 0..<1, original: "a", replacement: "b", operatorName: "x")
+        #expect(topLevel.testFilter(packageRoot: SourceRoot("/p")) == nil)
         let outside = Mutant(file: "/p/Other/b.swift", line: 1, column: 1, utf8Range: 0..<1, original: "a", replacement: "b", operatorName: "x")
         #expect(outside.testFilter(packageRoot: SourceRoot("/p")) == nil)
     }

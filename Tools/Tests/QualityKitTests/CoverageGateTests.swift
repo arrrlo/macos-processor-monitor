@@ -29,7 +29,7 @@ import Testing
 
     @Test func ignoresRegionsWithUnknownFileIndex() throws {
         let document = #"""
-        {"data":[{"files":[],"functions":[{"name":"f","count":1,"filenames":["/a.swift"],"regions":[[1,1,2,2,0,7,0,0]]}]}]}
+        {"data":[{"files":[],"functions":[{"name":"f","count":1,"filenames":["/a.swift"],"regions":[[1,1,2,2,0,7,0,0],[1,1,2,2,0,1,0,0]]}]}]}
         """#
         let export = try CoverageExport.decode(from: Data(document.utf8))
         #expect(export.functions[0].regions.isEmpty)

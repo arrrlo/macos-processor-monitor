@@ -129,8 +129,9 @@ import Testing
         extension Outer.Inner { func g() { } }
         actor A { func h() { } }
         class C { func i() { } }
+        func j() { }
         """
-        #expect(units(source).map(\.name) == ["Outer.Inner.f", "Outer.Inner.g", "A.h", "C.i"])
+        #expect(units(source).map(\.name) == ["Outer.Inner.f", "Outer.Inner.g", "A.h", "C.i", "j"])
     }
 
     @Test func multipleBindingsInOneDeclarationAreSeparateUnits() {

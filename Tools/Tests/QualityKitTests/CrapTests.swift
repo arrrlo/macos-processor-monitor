@@ -53,6 +53,9 @@ import Testing
     @Test func regionsMatchByColumnOnBoundaryLines() {
         let u = unit("f", lines: 3...3, complexity: 1, columns: (10, 20))
         #expect(CrapAnalysis.coverage(of: u, regions: [region(3, 9, count: 0), region(3, 12, count: 1), region(3, 21, count: 0)]) == 1)
+        // Regions starting exactly on the unit's first or last position belong to it.
+        #expect(CrapAnalysis.coverage(of: u, regions: [region(3, 10, count: 0), region(3, 12, count: 1)]) == 0.5)
+        #expect(CrapAnalysis.coverage(of: u, regions: [region(3, 20, count: 0), region(3, 12, count: 1)]) == 0.5)
     }
 
     @Test func unitWithoutRegionsCountsAsUncovered() {
@@ -130,7 +133,7 @@ import Testing
         fake.files["c.json"] = CoverageFixtures.json(files: [])
         fake.directories["/p/Sources"] = []
         #expect(CommandLineTool.run(["crap", "--json", "c.json", "--sources", "/p/Sources"], environment: fake.environment) == 0)
-        #expect(fake.lines.first == "CRAP gate: PASS (0 functions, max allowed 16)")
+        #expect(fake.lines == ["CRAP gate: PASS (0 functions, max allowed 16)"])
 
         let bad = FakeEnvironment()
         bad.files["c.json"] = CoverageFixtures.json(files: [])

@@ -58,6 +58,7 @@ public enum CrapAnalysis {
             return CrapEntry(unit: unit, coverage: coverage, score: CrapScore.compute(complexity: unit.complexity, coverage: coverage))
         }
         let worst = entries.sorted { lhs, rhs in
+            // mutation:disable-next-line equal keys only occur for units on one line with one score, whose order is irrelevant
             (-lhs.score, lhs.unit.file, lhs.unit.startLine) < (-rhs.score, rhs.unit.file, rhs.unit.startLine)
         }
         return CrapReport(

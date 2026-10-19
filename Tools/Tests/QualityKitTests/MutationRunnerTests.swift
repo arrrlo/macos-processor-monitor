@@ -7,6 +7,7 @@ final class FakeMutationWorld: @unchecked Sendable {
     private let lock = NSLock()
     private var files: [String: Data] = [:]
     private(set) var commands: [(command: String, directory: String)] = []
+    private(set) var timeouts: [Double] = []
     private(set) var output: [String] = []
     var respond: @Sendable (_ command: String, _ directory: String, _ world: FakeMutationWorld) -> CommandResult = { _, _, _ in
         CommandResult(status: 0, timedOut: false, output: "")
@@ -53,9 +54,10 @@ final class FakeMutationWorld: @unchecked Sendable {
         )
     }
 
-    func record(_ command: String, _ directory: String) -> CommandResult {
+    func record(_ command: String, _ directory: String, timeout: Double) -> CommandResult {
         lock.lock()
         commands.append((command, directory))
+        timeouts.append(timeout)
         lock.unlock()
         return respond(command, directory, self)
     }
@@ -65,7 +67,7 @@ struct FakeRunner: CommandRunning {
     let world: FakeMutationWorld
 
     func run(_ command: String, in directory: String, timeout: Double) -> CommandResult {
-        world.record(command, directory)
+        world.record(command, directory, timeout: timeout)
     }
 }
 
@@ -120,6 +122,8 @@ struct FakeRunner: CommandRunning {
         #expect(world.file("/tmp/pmtools-mutation/p-0/Other/b.swift") == "let b = x")
         // Mutants outside Sources/<Target>/ skip the targeted run and go straight to the full suite.
         #expect(world.commands.suffix(2).map(\.command) == ["build", "test"])
+        #expect(world.output.first == "[1/7] killed: Sources/A/a.swift:1:9 test `x` → `KILLED`")
+        #expect(world.output.last == "[7/7] killed: Other/b.swift:1:9 test `x` → `FULL`")
     }
 
     @Test func preparesAWorkspacePerJobAndChecksTheBaseline() throws {
@@ -158,6 +162,15 @@ struct FakeRunner: CommandRunning {
         let world = makeWorld()
         #expect(try MutationRunner(configuration: configuration, environment: world.environment).run([]).isEmpty)
         #expect(world.commands.isEmpty)
+    }
+
+    @Test func testsRunWithATimeoutScaledFromTheBaselineDuration() throws {
+        let world = makeWorld()
+        var fast = configuration
+        fast.minimumTimeout = 0
+        _ = try MutationRunner(configuration: fast, environment: world.environment).run([mutant("SURVIVOR")])
+        // Setup steps get the long setup timeout; the fake clock makes the baseline test take 1 s.
+        #expect(world.timeouts == [MutationRunner.setupTimeout, MutationRunner.setupTimeout, MutationRunner.setupTimeout, MutationRunner.setupTimeout, 3, 3])
     }
 
     @Test func testTimeoutScalesWithTheBaseline() {

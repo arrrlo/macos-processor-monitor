@@ -73,22 +73,22 @@ public final class MutationRunner: Sendable {
             let result = baseline(in: workspaces[index])
             baselines.withLock { $0[index] = result }
         }
-        let durations = try baselines.withLock { $0 }.sorted { $0.key < $1.key }.map { try $0.value.get() }
+        let durations = try baselines.withLock { $0 }.values.map { try $0.get() }
         let timeout = configuration.testTimeout(baseline: durations.reduce(0, max))
 
         let next = OSAllocatedUnfairLock(initialState: 0)
-        let results = OSAllocatedUnfairLock<[Int: MutantResult]>(initialState: [:])
+        let results = OSAllocatedUnfairLock<[MutantResult?]>(initialState: Array(repeating: nil, count: mutants.count))
         DispatchQueue.concurrentPerform(iterations: workspaces.count) { worker in
             while let index = next.withLock({ Self.take(&$0, below: mutants.count) }) {
                 let result = MutantResult(mutant: mutants[index], outcome: evaluate(mutants[index], in: workspaces[worker], timeout: timeout))
-                let done = results.withLock { finished -> Int in
-                    finished[index] = result
-                    return finished.count
+                let done = results.withLock { slots -> Int in
+                    slots[index] = result
+                    return slots.filter { $0 != nil }.count
                 }
                 environment.output("[\(done)/\(mutants.count)] \(result.outcome.rawValue): \(result.mutant.describe(root: root))")
             }
         }
-        return results.withLock { $0 }.sorted { $0.key < $1.key }.map(\.value)
+        return results.withLock { $0 }.compactMap { $0 }
     }
 
     /// Hands out 0, 1, 2… until `limit`, then `nil`.
