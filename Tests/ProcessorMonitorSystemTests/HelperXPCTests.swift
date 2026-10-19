@@ -203,10 +203,11 @@ func awaitValue<T: Sendable>(_ start: (@escaping @Sendable (T) -> Void) -> Void)
     @Test func usesTheHelperWhenItAnswers() async {
         let service = TopProcessesService(
             helper: { _, completion in completion([ProcessUsage(pid: 1, name: "root", cpuPercent: 3)]) },
-            local: ProcessUsageSampler.live()
+            local: ProcessUsageSampler.live(),
+            executablePath: { _ in "/sbin/launchd" }
         )
         let result = await awaitValue { service.topProcesses(limit: 5, completion: $0) }
-        #expect(result == TopProcessesResult(processes: [ProcessUsage(pid: 1, name: "root", cpuPercent: 3)], scope: .allProcesses))
+        #expect(result == TopProcessesResult(processes: [ProcessUsage(pid: 1, name: "launchd", cpuPercent: 3)], scope: .allProcesses))
     }
 
     @Test func liveSamplerMeasuresAQuarterSecondWindow() {
@@ -216,10 +217,15 @@ func awaitValue<T: Sendable>(_ start: (@escaping @Sendable (T) -> Void) -> Void)
     }
 
     @Test func fallsBackToTheCurrentUsersProcesses() async {
-        let service = TopProcessesService(helper: { _, completion in completion(nil) }, local: ProcessUsageSampler.live())
+        let service = TopProcessesService(
+            helper: { _, completion in completion(nil) },
+            local: ProcessUsageSampler.live(),
+            executablePath: { _ in "/bin/renamed" }
+        )
         let result = await awaitValue { service.topProcesses(limit: 5, completion: $0) }
         #expect(result.scope == .currentUser)
         #expect(result.processes.count == 5)
+        #expect(result.processes.allSatisfy { $0.name == "renamed" })
     }
 
     @Test func liveServiceAnswers() async {

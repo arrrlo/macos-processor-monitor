@@ -45,7 +45,8 @@ import Testing
         let world = makeWorld()
         let status = CommandLineTool.run(arguments + ["--changed", "main"], environment: world.environment)
         #expect(status == 0)
-        #expect(world.commands.first?.command == "git diff --name-only 'main' -- Sources")
+        // New, untracked files count as changed too.
+        #expect(world.commands.first?.command == "git diff --name-only 'main' -- Sources; git ls-files --others --exclude-standard -- Sources")
         #expect(world.output.contains("Found 1 mutants in 1 files"))
     }
 

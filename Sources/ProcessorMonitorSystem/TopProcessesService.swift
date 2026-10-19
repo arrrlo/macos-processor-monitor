@@ -22,26 +22,32 @@ public final class TopProcessesService: TopProcessesProviding {
 
     private let helper: HelperCall
     private let local: ProcessUsageSampler
+    private let executablePath: @Sendable (Int32) -> String?
     private let queue = DispatchQueue(label: "io.github.arrrlo.macos-processor-monitor.local-processes", qos: .utility)
 
-    public init(helper: @escaping HelperCall, local: ProcessUsageSampler) {
+    public init(helper: @escaping HelperCall, local: ProcessUsageSampler, executablePath: @escaping @Sendable (Int32) -> String?) {
         self.helper = helper
         self.local = local
+        self.executablePath = executablePath
     }
 
     public static func live() -> TopProcessesService {
-        TopProcessesService(helper: HelperClient.privileged().topProcesses, local: .live())
+        TopProcessesService(helper: HelperClient.privileged().topProcesses, local: .live(), executablePath: ProcessNames.executablePath)
     }
 
     public func topProcesses(limit: Int, completion: @escaping @Sendable (TopProcessesResult) -> Void) {
         let local = local
         let queue = queue
+        let executablePath = executablePath
         helper(limit) { processes in
             guard let processes else {
-                queue.async { completion(TopProcessesResult(processes: local.top(limit: limit), scope: .currentUser)) }
+                queue.async {
+                    let mine = ProcessNames.refine(local.top(limit: limit), executablePath: executablePath)
+                    completion(TopProcessesResult(processes: mine, scope: .currentUser))
+                }
                 return
             }
-            completion(TopProcessesResult(processes: processes, scope: .allProcesses))
+            completion(TopProcessesResult(processes: ProcessNames.refine(processes, executablePath: executablePath), scope: .allProcesses))
         }
     }
 }

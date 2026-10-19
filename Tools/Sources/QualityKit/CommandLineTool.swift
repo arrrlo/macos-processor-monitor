@@ -104,7 +104,8 @@ public enum CommandLineTool {
         return report.passed ? 0 : 1
     }
 
-    /// Swift files under Sources/, minus `--exclude`, limited to `--file` and to files changed since `--changed`.
+    /// Swift files under Sources/, minus `--exclude`, limited to `--file` and to files changed since
+    /// `--changed` (including new, untracked ones).
     private static func mutationFiles(_ list: ArgumentList, root: SourceRoot, environment: ToolEnvironment) throws -> [String] {
         let excluded = Set(list.values(for: "exclude"))
         var files = try environment.swiftFiles(root.path + "/Sources").filter { !excluded.contains(root.display($0)) }
@@ -113,7 +114,8 @@ public enum CommandLineTool {
             files = files.filter { only.contains(root.display($0)) }
         }
         if let reference = list.optionalValue(for: "changed") {
-            let diff = environment.runner.run("git diff --name-only \(MutationRunner.quote(reference)) -- Sources", in: root.path, timeout: 60)
+            let command = "git diff --name-only \(MutationRunner.quote(reference)) -- Sources; git ls-files --others --exclude-standard -- Sources"
+            let diff = environment.runner.run(command, in: root.path, timeout: 60)
             let changed = Set(diff.output.split(separator: "\n").map(String.init))
             files = files.filter { changed.contains(root.display($0)) }
         }
