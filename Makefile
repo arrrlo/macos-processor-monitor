@@ -26,7 +26,7 @@ MUTATION_JOBS ?= 6
 MUTATION_EXCLUDES := --exclude Sources/ProcessorMonitor/main.swift --exclude Sources/ProcessorMonitorHelper/main.swift
 
 .PHONY: help build test coverage crap gate mutate tools-build tools-test tools-coverage tools-crap tools-gate \
-        tools-mutate app pkg run overhead icon clean
+        tools-mutate app pkg run overhead screenshots icon clean
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-16s %s\n", $$1, $$2}'
@@ -93,6 +93,9 @@ run: app ## Build and launch the .app (quits a running copy first)
 
 overhead: ## Average CPU and memory of the running app over SECONDS (default 300)
 	scripts/measure-overhead.sh $(or $(SECONDS),300)
+
+screenshots: ## Render README images from live readings into docs/images
+	PM_SCREENSHOT_DIR="$(CURDIR)/docs/images" swift test $(TEST_FLAGS) $(STRICT_FLAGS) --filter ScreenshotTests
 
 icon: ## Regenerate packaging/AppIcon.icns
 	scripts/make-icon.sh

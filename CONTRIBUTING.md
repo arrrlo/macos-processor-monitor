@@ -42,10 +42,14 @@ reach 100% coverage. Avoid them:
 
 ## Equivalent mutants
 
-Sometimes a mutant cannot change behaviour, for example `>` versus `>=` inside a clamp. Suppress it
-on the line above, with a reason:
+Sometimes a mutant cannot change behaviour. For example, a sort comparator over unique keys never
+sees ties, so `<` and `<=` sort identically. First try to restructure the code so the operator
+disappears (`max(a, b) - b` instead of `a > b ? a - b : 0`). If that isn't possible, suppress the
+mutant on the line above with a reason:
 
 ```swift
-// mutation:disable-next-line max() makes the boundary irrelevant
-let value = max(count, 0)
+// mutation:disable-next-line PIDs are unique, so two entries never compare equal and `<=` sorts identically
+let ranked = usage.sorted { ($1.cpuPercent, $0.pid) < ($0.cpuPercent, $1.pid) }
 ```
+
+A suppression without a reason is ignored and reported as a warning.
