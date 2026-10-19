@@ -20,6 +20,10 @@ IOHIDEventRef _Nullable IOHIDServiceClientCopyEvent(IOHIDServiceClientRef servic
 
 double IOHIDEventGetFloatValue(IOHIDEventRef event, int32_t field);
 
+// Used by tests to build the events that sensor-less machines (CI VMs) never return.
+IOHIDEventRef IOHIDEventCreate(CFAllocatorRef _Nullable allocator, uint32_t type, uint64_t timestamp, uint32_t options) CF_RETURNS_RETAINED;
+void IOHIDEventSetFloatValue(IOHIDEventRef event, int32_t field, double value);
+
 CF_ASSUME_NONNULL_END
 
 #endif

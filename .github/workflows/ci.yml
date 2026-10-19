@@ -18,7 +18,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The project builds with the Command Line Tools toolchain (Swift 6.4), not the image's
       # default Xcode, so coverage and diagnostics match local runs exactly.
@@ -29,7 +29,7 @@ jobs:
           swift --version 2>&1 | grep -q 'Swift version 6\.4'
 
       - name: Cache swift-syntax build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: Tools/.build
           key: tools-${{ runner.os }}-${{ hashFiles('Tools/Package.resolved', 'Tools/Package.swift') }}

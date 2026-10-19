@@ -28,11 +28,32 @@ enum HIDEventSystem {
     }
 
     static func temperature(of service: IOHIDServiceClient) -> Double? {
-        var celsius: Double?
-        if let event = IOHIDServiceClientCopyEvent(service, temperatureEventType, 0, 0) {
-            celsius = IOHIDEventGetFloatValue(event, temperatureField)
-        }
-        return celsius
+        celsius(from: IOHIDServiceClientCopyEvent(service, temperatureEventType, 0, 0))
+    }
+
+    /// Separate from the copy so tests can feed it events that sensor-less machines never return.
+    static func celsius(from event: IOHIDEvent?) -> Double? {
+        guard let event else { return nil }
+        return IOHIDEventGetFloatValue(event, temperatureField)
+    }
+}
+
+/// The HID calls discovery needs. Generic so tests can stand in for sensors a VM does not have.
+struct HIDAccess<Service>: Sendable {
+    let services: @Sendable () -> [Service]
+    let intProperty: @Sendable (Service, String) -> Int?
+    let stringProperty: @Sendable (Service, String) -> String?
+    let temperature: @Sendable (Service) -> Double?
+}
+
+extension HIDAccess where Service == IOHIDServiceClient {
+    static var live: HIDAccess {
+        HIDAccess(
+            services: HIDEventSystem.services,
+            intProperty: HIDEventSystem.intProperty,
+            stringProperty: HIDEventSystem.stringProperty,
+            temperature: HIDEventSystem.temperature
+        )
     }
 }
 
@@ -55,13 +76,18 @@ public enum HIDTemperatureSensors {
 
     /// Every temperature service with its product name. Enumerating is the expensive part, so do it once.
     public static func discover() -> [TemperatureSensor] {
-        HIDEventSystem.services().compactMap { service in
-            let page = HIDEventSystem.intProperty(service, "PrimaryUsagePage")
-            let usage = HIDEventSystem.intProperty(service, "PrimaryUsage")
+        discover(using: .live)
+    }
+
+    static func discover<Service>(using access: HIDAccess<Service>) -> [TemperatureSensor] {
+        access.services().compactMap { service in
+            let page = access.intProperty(service, "PrimaryUsagePage")
+            let usage = access.intProperty(service, "PrimaryUsage")
             guard isTemperatureService(usagePage: page, usage: usage),
-                  let name = HIDEventSystem.stringProperty(service, "Product") else { return nil }
+                  let name = access.stringProperty(service, "Product") else { return nil }
+            // IOHIDServiceClient is thread-safe but not marked Sendable.
             nonisolated(unsafe) let handle = service
-            return TemperatureSensor(name: name) { HIDEventSystem.temperature(of: handle) }
+            return TemperatureSensor(name: name) { access.temperature(handle) }
         }
     }
 }

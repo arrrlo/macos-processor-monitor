@@ -21,7 +21,7 @@ jobs:
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
@@ -39,7 +39,7 @@ jobs:
           test "v$VERSION" = "$TAG" || { echo "Tag $TAG does not match VERSION $VERSION"; exit 1; }
 
       - name: Cache swift-syntax build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: Tools/.build
           key: tools-${{ runner.os }}-${{ hashFiles('Tools/Package.resolved', 'Tools/Package.swift') }}
