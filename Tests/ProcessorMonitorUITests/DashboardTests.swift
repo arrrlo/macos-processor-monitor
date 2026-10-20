@@ -68,6 +68,18 @@ extension AppKitTests {
             #expect(DashboardModel.barWidth(2, of: 200) == 200)
             #expect(DashboardModel.barWidth(-1, of: 200) == 0)
         }
+
+        @Test func coreBarsSpanTheFullCardWidth() {
+            #expect(DashboardView.cardContentWidth == 536)
+            #expect(DashboardModel.coreBarWidth(count: 12) == 41)
+            #expect(DashboardModel.coreBarWidth(count: 6) == 86)
+            #expect(DashboardModel.coreBarWidth(count: 1) == 536)
+            #expect(DashboardModel.coreBarWidth(count: 0) == 0)
+            for count in [6, 12] {
+                let row = DashboardModel.coreBarWidth(count: count) * CGFloat(count) + DashboardView.coreSpacing * CGFloat(count - 1)
+                #expect(row == DashboardView.cardContentWidth)
+            }
+        }
     }
 
     @MainActor @Suite struct DashboardWindowControllerTests {

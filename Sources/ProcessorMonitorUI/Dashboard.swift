@@ -22,10 +22,23 @@ public struct DashboardModel {
     static func barWidth(_ fraction: Double, of width: CGFloat) -> CGFloat {
         width * CGFloat(min(max(fraction, 0), 1))
     }
+
+    /// Width of each of a cluster's `count` core bars so the bars and their gaps span a full-width card.
+    static func coreBarWidth(count: Int) -> CGFloat {
+        guard count > 0 else { return 0 }
+        return (DashboardView.cardContentWidth - DashboardView.coreSpacing * CGFloat(count - 1)) / CGFloat(count)
+    }
 }
 
 /// Read-only dashboard. It has no controls on purpose: every action lives in the menu.
 struct DashboardView: View {
+    static let width: CGFloat = 600
+    static let padding: CGFloat = 18
+    static let cardPadding: CGFloat = 14
+    /// The width a full-width card leaves for its content.
+    static let cardContentWidth: CGFloat = width - 2 * padding - 2 * cardPadding
+    static let coreSpacing: CGFloat = 4
+
     let model: DashboardModel
 
     var body: some View {
@@ -37,8 +50,8 @@ struct DashboardView: View {
             OccupancyCard(model: model)
             ProcessesCard(model: model)
         }
-        .padding(18)
-        .frame(width: 600)
+        .padding(Self.padding)
+        .frame(width: Self.width)
     }
 }
 
@@ -56,7 +69,7 @@ private struct Card<Content: View>: View {
             Text(title).font(.headline).foregroundStyle(.secondary)
             content
         }
-        .padding(14)
+        .padding(DashboardView.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.06)))
     }
@@ -126,9 +139,11 @@ private struct OccupancyCard: View {
                         Spacer()
                         Text(row.value).monospacedDigit()
                     }
-                    HStack(alignment: .bottom, spacing: 4) {
-                        ForEach(model.coreLoads(for: name), id: \.index) { core in
-                            CoreBar(core: core)
+                    let cores = model.coreLoads(for: name)
+                    let barWidth = DashboardModel.coreBarWidth(count: cores.count)
+                    HStack(alignment: .bottom, spacing: DashboardView.coreSpacing) {
+                        ForEach(cores, id: \.index) { core in
+                            CoreBar(core: core, width: barWidth)
                         }
                     }
                 }
@@ -140,6 +155,7 @@ private struct OccupancyCard: View {
 private struct CoreBar: View {
     static let height: CGFloat = 40
     let core: CoreLoad
+    let width: CGFloat
 
     var body: some View {
         VStack(spacing: 2) {
@@ -147,7 +163,7 @@ private struct CoreBar: View {
                 RoundedRectangle(cornerRadius: 2).fill(Color.gray.opacity(0.2))
                 RoundedRectangle(cornerRadius: 2).fill(Color.accentColor).frame(height: DashboardModel.barWidth(core.load, of: Self.height))
             }
-            .frame(width: 16, height: Self.height)
+            .frame(width: width, height: Self.height)
             Text(verbatim: String(core.index)).font(.system(size: 8)).foregroundStyle(.secondary)
         }
         .help("Core \(core.index): \(MetricFormatter.percent(core.load))")

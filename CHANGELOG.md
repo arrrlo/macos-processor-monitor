@@ -11,6 +11,10 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 
 - This changelog. Release notes on GitHub now list the changes in each version.
 
+### Changed
+
+- The dashboard's core bars stretch to fill the Occupancy card from edge to edge.
+
 ### Fixed
 
 - The release `.sha256` file names the installer without a `build/` prefix, so
