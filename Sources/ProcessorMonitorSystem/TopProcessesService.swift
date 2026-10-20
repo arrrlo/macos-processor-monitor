@@ -3,6 +3,9 @@ import Dispatch
 import ProcessorMonitorCore
 
 extension ProcessUsageSampler {
+    /// Waits out the rest of a measurement window.
+    static let pause: @Sendable (UInt64) -> Void = { nanoseconds in usleep(useconds_t(nanoseconds / 1_000)) }
+
     /// Samples the local process table: 250 ms first window, baselines reused for up to 5 s.
     public static func live(reader: ProcessTableReader = ProcessTableReader()) -> ProcessUsageSampler {
         ProcessUsageSampler(
@@ -10,7 +13,7 @@ extension ProcessUsageSampler {
             minimumWindow: 250_000_000,
             maximumBaselineAge: 5_000_000_000,
             snapshot: reader.snapshot,
-            sleep: { nanoseconds in usleep(useconds_t(nanoseconds / 1_000)) }
+            sleep: pause
         )
     }
 }

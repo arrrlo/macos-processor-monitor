@@ -53,6 +53,7 @@ extension AppKitTests {
                             gpuLoad: sources.readGPULoad,
                             gpuTemperature: sources.readGPUTemperature,
                             topProcesses: sources.processes,
+                            gpuProcesses: sources.gpuProcesses,
                             topology: topology
                         ),
                         scheduler: scheduler,
@@ -102,6 +103,8 @@ extension AppKitTests {
             let menu = harness.controller.menu.menu
             harness.controller.menu.menuWillOpen(menu)
             #expect(harness.sources.processes.requests == [10])
+            // The menu has no GPU list.
+            #expect(harness.sources.gpuProcesses.requests.isEmpty)
             harness.sources.processes.complete(with: MonitorSnapshot.sample.topProcesses!)
             await settle()
             #expect(menu.items[10].attributedTitle?.string == "Top processes")
@@ -163,15 +166,21 @@ extension AppKitTests {
             #expect(harness.controller.dashboard.model.gpu == GPUInfo(name: "Apple M5 Max", coreCount: 32))
             #expect(harness.controller.dashboard.model.snapshot.gpuTemperature?.average == 41.6)
             #expect(harness.sources.processes.requests == [10])
+            #expect(harness.sources.gpuProcesses.requests == [10])
             harness.sources.processes.complete(with: MonitorSnapshot.sample.topProcesses!)
+            harness.sources.gpuProcesses.complete(with: MonitorSnapshot.sample.topProcesses!)
             await settle()
             #expect(harness.controller.dashboard.model.snapshot.topProcesses == MonitorSnapshot.sample.topProcesses)
+            #expect(harness.controller.dashboard.model.snapshot.topGPUProcesses == MonitorSnapshot.sample.topProcesses)
             harness.scheduler.advance(by: 2)
             await settle()
             #expect(harness.controller.dashboard.model.snapshot.load?.overall.total == 0.25)
             window.close()
             harness.scheduler.advance(by: 2)
             #expect(harness.sources.processes.requests.count == 2)
+            #expect(harness.sources.gpuProcesses.requests.count == 2)
+            harness.scheduler.advance(by: 4)
+            #expect(harness.sources.gpuProcesses.requests.count == 2)
             harness.controller.stop()
         }
 

@@ -9,6 +9,7 @@ public struct MonitorSnapshot: Equatable, Sendable {
     public var gpuLoad: GPULoad?
     public var gpuTemperature: TemperatureSummary?
     public var gpuHistory = GPULoadHistory()
+    public var topGPUProcesses: TopProcessesResult?
 
     public init(
         load: CPULoad?,
@@ -40,6 +41,7 @@ public final class SamplingEngine: Sendable {
         let gpuLoad: @Sendable () -> GPULoad?
         let gpuTemperature: @Sendable () -> TemperatureSummary?
         let topProcesses: any TopProcessesProviding
+        let gpuProcesses: any TopProcessesProviding
         let topology: CPUTopology
 
         public init(
@@ -48,6 +50,7 @@ public final class SamplingEngine: Sendable {
             gpuLoad: @escaping @Sendable () -> GPULoad?,
             gpuTemperature: @escaping @Sendable () -> TemperatureSummary?,
             topProcesses: any TopProcessesProviding,
+            gpuProcesses: any TopProcessesProviding,
             topology: CPUTopology
         ) {
             self.cpuTicks = cpuTicks
@@ -55,8 +58,15 @@ public final class SamplingEngine: Sendable {
             self.gpuLoad = gpuLoad
             self.gpuTemperature = gpuTemperature
             self.topProcesses = topProcesses
+            self.gpuProcesses = gpuProcesses
             self.topology = topology
         }
+    }
+
+    /// A process list that is measured only while someone looks at it, one request at a time.
+    private struct Feed: Sendable {
+        var demand = false
+        var requestInFlight = false
     }
 
     private struct State: Sendable {
@@ -65,8 +75,8 @@ public final class SamplingEngine: Sendable {
         var previousTicks: CPUTicksSample?
         var secondsSinceTemperature: Double = 0
         var snapshot = MonitorSnapshot.empty
-        var processDemand = false
-        var processRequestInFlight = false
+        var processes = Feed()
+        var gpuProcesses = Feed()
     }
 
     private let sources: Sources
@@ -127,8 +137,15 @@ public final class SamplingEngine: Sendable {
         }
     }
 
+    /// The menu or the dashboard shows the CPU's top processes.
     public func setProcessDemand(_ active: Bool) {
-        state.withLock { $0.processDemand = active }
+        state.withLock { $0.processes.demand = active }
+        requestProcessesIfNeeded()
+    }
+
+    /// The dashboard shows the GPU's top processes.
+    public func setGPUProcessDemand(_ active: Bool) {
+        state.withLock { $0.gpuProcesses.demand = active }
         requestProcessesIfNeeded()
     }
 
@@ -178,21 +195,34 @@ public final class SamplingEngine: Sendable {
     }
 
     private func requestProcessesIfNeeded() {
+        request(\.processes, from: sources.topProcesses, into: \.topProcesses)
+        request(\.gpuProcesses, from: sources.gpuProcesses, into: \.topGPUProcesses)
+    }
+
+    private func request(
+        _ feed: WritableKeyPath<State, Feed> & Sendable,
+        from provider: any TopProcessesProviding,
+        into field: WritableKeyPath<MonitorSnapshot, TopProcessesResult?> & Sendable
+    ) {
         let shouldRequest = state.withLock { state -> Bool in
-            guard state.processDemand, !state.processRequestInFlight else { return false }
-            state.processRequestInFlight = true
+            guard state[keyPath: feed].demand, !state[keyPath: feed].requestInFlight else { return false }
+            state[keyPath: feed].requestInFlight = true
             return true
         }
         guard shouldRequest else { return }
-        sources.topProcesses.topProcesses(limit: processLimit) { [weak self] result in
-            self?.receive(result)
+        provider.topProcesses(limit: processLimit) { [weak self] result in
+            self?.receive(result, feed: feed, into: field)
         }
     }
 
-    private func receive(_ result: TopProcessesResult) {
+    private func receive(
+        _ result: TopProcessesResult,
+        feed: WritableKeyPath<State, Feed> & Sendable,
+        into field: WritableKeyPath<MonitorSnapshot, TopProcessesResult?> & Sendable
+    ) {
         state.withLock { state in
-            state.processRequestInFlight = false
-            state.snapshot.topProcesses = result
+            state[keyPath: feed].requestInFlight = false
+            state.snapshot[keyPath: field] = result
         }
         publishSnapshot()
     }

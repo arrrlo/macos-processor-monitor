@@ -31,6 +31,8 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 
 - The sampling engine keeps the last 30 GPU load readings for the dashboard, cleared on every start
   and interval change.
+- The sampling engine measures the GPU's top processes while the dashboard is visible, from the
+  GPU time the graphics driver records for each process. No helper is needed.
 - The test that the CPU tick buffer is unmapped no longer fails when a parallel test maps memory at
   the freed address.
 

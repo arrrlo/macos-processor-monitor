@@ -37,3 +37,5 @@ Design decisions that keep the attack surface small:
 The temperature readings use the private `IOHIDEventSystemClient` API. It is read-only and needs no
 special privileges. The GPU temperature comes from the AppleSMC user client, which any user may
 open. The app only sends its read commands (list keys, key info, read a key), never a write.
+The GPU's top processes come from the GPU time the graphics driver records for each process in the
+IORegistry, which every user can read, so they need neither the helper nor any privilege.

@@ -79,6 +79,7 @@ public final class AppController {
         let gpu = GPUReader()
         let gpuTemperature = GPUTemperatureReader.live()
         let processes = TopProcessesService.live()
+        let gpuProcesses = GPUProcessesService.live()
         let scheduler = DispatchScheduler(queue: DispatchQueue(label: "io.github.arrrlo.macos-processor-monitor.sampling", qos: .utility))
         return AppController(
             topology: topology,
@@ -98,6 +99,7 @@ public final class AppController {
                         gpuLoad: gpu.read,
                         gpuTemperature: gpuTemperature.read,
                         topProcesses: processes,
+                        gpuProcesses: gpuProcesses,
                         topology: topology
                     ),
                     scheduler: scheduler,
@@ -165,7 +167,7 @@ public final class AppController {
     }
 
     private func resolveApps() -> [Int32: AppInfo] {
-        identities.resolve(latest.topProcesses?.processes ?? [])
+        identities.resolve((latest.topProcesses?.processes ?? []) + (latest.topGPUProcesses?.processes ?? []))
     }
 
     // MARK: - Menu actions
@@ -175,8 +177,10 @@ public final class AppController {
         refreshMenu()
     }
 
+    /// Only the dashboard lists the GPU's processes, so it alone creates that demand.
     private func dashboardVisibilityChanged(_ visible: Bool) {
         demand.dashboardVisible = visible
+        engine?.setGPUProcessDemand(visible)
     }
 
     private func openDashboard() {

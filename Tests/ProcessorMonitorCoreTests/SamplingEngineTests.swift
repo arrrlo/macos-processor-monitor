@@ -21,6 +21,7 @@ final class Published: @unchecked Sendable {
                 gpuLoad: sources.readGPULoad,
                 gpuTemperature: sources.readGPUTemperature,
                 topProcesses: sources.processes,
+                gpuProcesses: sources.gpuProcesses,
                 topology: topology
             ),
             scheduler: scheduler,
@@ -195,6 +196,40 @@ final class Published: @unchecked Sendable {
         #expect(published.last?.topProcesses == result)
     }
 
+    /// The GPU list is only on the dashboard, so it has its own demand, separate from the menu's.
+    @Test func gpuProcessesAreAnIndependentFeed() {
+        let gpuResult = TopProcessesResult(processes: [ProcessUsage(pid: 405, name: "WindowServer", cpuPercent: 3)], scope: .allProcesses)
+        let sources = FakeSources()
+        let scheduler = FakeScheduler()
+        let published = Published()
+        let engine = makeEngine(sources, scheduler, published: published)
+        engine.start()
+        engine.setProcessDemand(true)
+        scheduler.advance(by: 2)
+        #expect(sources.gpuProcesses.requests.isEmpty)
+
+        engine.setGPUProcessDemand(true)
+        #expect(sources.gpuProcesses.requests == [10])
+        #expect(sources.processes.requests == [10])
+        // In flight: a tick does not ask again.
+        scheduler.advance(by: 2)
+        #expect(sources.gpuProcesses.requests.count == 1)
+
+        sources.gpuProcesses.complete(with: gpuResult)
+        #expect(published.last?.topGPUProcesses == gpuResult)
+        #expect(published.last?.topProcesses == nil)
+        scheduler.advance(by: 2)
+        #expect(sources.gpuProcesses.requests.count == 2)
+
+        sources.gpuProcesses.complete(with: gpuResult)
+        engine.setGPUProcessDemand(false)
+        scheduler.advance(by: 4)
+        #expect(sources.gpuProcesses.requests.count == 2)
+        sources.processes.complete(with: result)
+        #expect(published.last?.topProcesses == result)
+        #expect(published.last?.topGPUProcesses == gpuResult)
+    }
+
     @Test func intervalChangeReschedulesTheTimer() {
         let sources = FakeSources()
         sources.ticks = FakeSources.ticks(busy: [1, 2, 3])
@@ -271,5 +306,6 @@ final class Published: @unchecked Sendable {
         #expect(MonitorSnapshot.empty.gpuLoad == nil)
         #expect(MonitorSnapshot.empty.gpuTemperature == nil)
         #expect(MonitorSnapshot.empty.gpuHistory == GPULoadHistory())
+        #expect(MonitorSnapshot.empty.topGPUProcesses == nil)
     }
 }

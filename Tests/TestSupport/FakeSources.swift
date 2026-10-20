@@ -12,6 +12,7 @@ public final class FakeSources: @unchecked Sendable {
     public private(set) var gpuLoadReads = 0
     public private(set) var gpuTemperatureReads = 0
     public let processes = FakeTopProcesses()
+    public let gpuProcesses = FakeTopProcesses()
 
     public init() {}
 
