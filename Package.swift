@@ -9,7 +9,8 @@ let package = Package(
         .executable(name: "ProcessorMonitorHelper", targets: ["ProcessorMonitorHelper"]),
     ],
     targets: [
-        // Declarations for the private IOHIDEventSystemClient API (symbols are exported by IOKit).
+        // Declarations for the private IOHIDEventSystemClient API (symbols are exported by IOKit)
+        // and the AppleSMC user client's parameter block.
         .target(name: "CSystemShims", linkerSettings: [.linkedFramework("IOKit")]),
         // Pure logic, no system calls.
         .target(name: "ProcessorMonitorCore"),

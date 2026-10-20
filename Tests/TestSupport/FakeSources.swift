@@ -6,9 +6,11 @@ public final class FakeSources: @unchecked Sendable {
     public var ticks: [CPUTicksSample?] = []
     public var temperatures: [TemperatureSummary?] = []
     public var gpuLoads: [GPULoad?] = []
+    public var gpuTemperatures: [TemperatureSummary?] = []
     public private(set) var tickReads = 0
     public private(set) var temperatureReads = 0
     public private(set) var gpuLoadReads = 0
+    public private(set) var gpuTemperatureReads = 0
     public let processes = FakeTopProcesses()
 
     public init() {}
@@ -37,6 +39,11 @@ public final class FakeSources: @unchecked Sendable {
     public func readGPULoad() -> GPULoad? {
         defer { gpuLoadReads += 1 }
         return gpuLoadReads < gpuLoads.count ? gpuLoads[gpuLoadReads] : gpuLoads.last ?? nil
+    }
+
+    public func readGPUTemperature() -> TemperatureSummary? {
+        defer { gpuTemperatureReads += 1 }
+        return gpuTemperatureReads < gpuTemperatures.count ? gpuTemperatures[gpuTemperatureReads] : gpuTemperatures.last ?? nil
     }
 }
 

@@ -36,3 +36,18 @@ import Testing
         #expect(CPUTemperatureSensors.select(["NAND CH0 temp", "gas gauge battery"]).isEmpty)
     }
 }
+
+@Suite struct GPUTemperatureSensorsTests {
+    @Test func takesEveryoneUpToEight() {
+        #expect(GPUTemperatureSensors.select(count: 0).isEmpty)
+        #expect(GPUTemperatureSensors.select(count: 3) == [0, 1, 2])
+        #expect(GPUTemperatureSensors.select(count: 8) == Array(0..<8))
+    }
+
+    /// An M5 Max has 84 GPU sensors within a degree of each other; eight spread across them read the same.
+    @Test func spreadsEightAcrossMore() {
+        #expect(GPUTemperatureSensors.limit == 8)
+        #expect(GPUTemperatureSensors.select(count: 84) == [0, 10, 21, 31, 42, 52, 63, 73])
+        #expect(GPUTemperatureSensors.select(count: 9) == [0, 1, 2, 3, 4, 5, 6, 7])
+    }
+}

@@ -39,3 +39,16 @@ public enum CPUTemperatureSensors {
         return names.indices.filter { names[$0].hasPrefix("PMU tdie") }
     }
 }
+
+/// Picks which of the SMC's GPU sensors (`Tg*`) to read. An M5 Max has 84 that read within a degree
+/// of each other, so an even spread of at most `limit` gives the same average for a tenth of the
+/// cost (8 reads take about 0.1 ms of CPU, 84 take 1 ms).
+public enum GPUTemperatureSensors {
+    public static let limit = 8
+
+    /// Indices of the chosen sensors among `count`, spread evenly from the first.
+    public static func select(count: Int) -> [Int] {
+        let chosen = min(count, limit)
+        return (0..<chosen).map { $0 * count / chosen }
+    }
+}

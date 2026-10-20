@@ -19,6 +19,7 @@ final class Published: @unchecked Sendable {
                 cpuTicks: sources.readTicks,
                 temperature: sources.readTemperature,
                 gpuLoad: sources.readGPULoad,
+                gpuTemperature: sources.readGPUTemperature,
                 topProcesses: sources.processes,
                 topology: topology
             ),
@@ -84,6 +85,28 @@ final class Published: @unchecked Sendable {
         scheduler.advance(by: 2)
         #expect(published.last?.gpuLoad == nil)
         #expect(sources.gpuLoadReads == 3)
+    }
+
+    @Test func gpuTemperatureIsReadWithTheProcessorTemperature() {
+        let cool = TemperatureSummary(average: 40, maximum: 41, sensorCount: 8)
+        let sources = FakeSources()
+        sources.ticks = FakeSources.ticks(busy: [1, 2, 3, 4, 5])
+        sources.temperatures = [warm]
+        sources.gpuTemperatures = [cool, hot]
+        let scheduler = FakeScheduler()
+        let published = Published()
+        let engine = makeEngine(sources, scheduler, interval: 1, published: published)
+
+        engine.start()
+        #expect(sources.gpuTemperatureReads == 1)
+        #expect(published.last?.gpuTemperature == cool)
+        scheduler.advance(by: 3)
+        #expect(sources.gpuTemperatureReads == 1)
+        scheduler.advance(by: 1)
+        #expect(sources.gpuTemperatureReads == 2)
+        #expect(sources.temperatureReads == 2)
+        #expect(published.last?.gpuTemperature == hot)
+        #expect(published.last?.temperature == warm)
     }
 
     @Test func slowIntervalsReadTemperatureEveryTick() {
@@ -214,5 +237,6 @@ final class Published: @unchecked Sendable {
     @Test func emptySnapshot() {
         #expect(MonitorSnapshot.empty == MonitorSnapshot(load: nil, clusters: [], temperature: nil, topProcesses: nil))
         #expect(MonitorSnapshot.empty.gpuLoad == nil)
+        #expect(MonitorSnapshot.empty.gpuTemperature == nil)
     }
 }

@@ -21,9 +21,10 @@ public enum MetricFormatter {
         return String(format: "%.1f%%", tenths)
     }
 
-    /// The menu bar text: processor, then GPU, e.g. "23%  49°C   GPU 5%".
+    /// The menu bar text: processor, then GPU, e.g. "23%  49°C   GPU 5%  42°C".
     public static func statusTitle(_ snapshot: MonitorSnapshot) -> String {
-        "\(percent(snapshot.load?.overall.total))  \(temperature(snapshot.temperature?.average))   GPU \(percent(snapshot.gpuLoad?.device))"
+        let processor = "\(percent(snapshot.load?.overall.total))  \(temperature(snapshot.temperature?.average))"
+        return "\(processor)   GPU \(percent(snapshot.gpuLoad?.device))  \(temperature(snapshot.gpuTemperature?.average))"
     }
 }
 
@@ -56,6 +57,7 @@ public struct MenuText: Equatable, Sendable {
     public let temperature: Row
     public let clusters: [Row]
     public let gpuLoad: Row
+    public let gpuTemperature: Row
     public let processHeader: String
     public let processes: [ProcessRow]
 
@@ -71,6 +73,7 @@ public struct MenuText: Equatable, Sendable {
             Row(title: "\(name) cores", value: MetricFormatter.percent(snapshot.clusters.first { $0.name == name }?.average))
         }
         gpuLoad = Row(title: "GPU load", value: MetricFormatter.percent(snapshot.gpuLoad?.device))
+        gpuTemperature = Row(title: "GPU temperature", value: Self.temperatureValue(snapshot.gpuTemperature))
         processHeader = Self.processHeader(snapshot.topProcesses?.scope)
         processes = (snapshot.topProcesses?.processes ?? []).map {
             ProcessRow(pid: $0.pid, row: Row(title: $0.name, value: MetricFormatter.processPercent($0.cpuPercent)))
@@ -163,17 +166,20 @@ public struct StatusTitleThrottle: Sendable {
         let load: Double?
         let temperature: Double?
         let gpuLoad: Double?
+        let gpuTemperature: Double?
 
         init(_ snapshot: MonitorSnapshot) {
             load = snapshot.load?.overall.total
             temperature = snapshot.temperature?.average
             gpuLoad = snapshot.gpuLoad?.device
+            gpuTemperature = snapshot.gpuTemperature?.average
         }
 
         func moved(from old: Reading) -> Bool {
             StatusTitleThrottle.moved(old.load, load, by: StatusTitleThrottle.loadStep)
                 || StatusTitleThrottle.moved(old.temperature, temperature, by: StatusTitleThrottle.temperatureStep)
                 || StatusTitleThrottle.moved(old.gpuLoad, gpuLoad, by: StatusTitleThrottle.gpuLoadStep)
+                || StatusTitleThrottle.moved(old.gpuTemperature, gpuTemperature, by: StatusTitleThrottle.temperatureStep)
         }
     }
 

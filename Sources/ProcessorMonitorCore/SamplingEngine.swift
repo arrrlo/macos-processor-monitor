@@ -7,26 +7,29 @@ public struct MonitorSnapshot: Equatable, Sendable {
     public var temperature: TemperatureSummary?
     public var topProcesses: TopProcessesResult?
     public var gpuLoad: GPULoad?
+    public var gpuTemperature: TemperatureSummary?
 
     public init(
         load: CPULoad?,
         clusters: [ClusterLoad],
         temperature: TemperatureSummary?,
         topProcesses: TopProcessesResult?,
-        gpuLoad: GPULoad? = nil
+        gpuLoad: GPULoad? = nil,
+        gpuTemperature: TemperatureSummary? = nil
     ) {
         self.load = load
         self.clusters = clusters
         self.temperature = temperature
         self.topProcesses = topProcesses
         self.gpuLoad = gpuLoad
+        self.gpuTemperature = gpuTemperature
     }
 
     public static let empty = MonitorSnapshot(load: nil, clusters: [], temperature: nil, topProcesses: nil)
 }
 
 /// The app's only periodic work. Each tick costs one `host_processor_info` call and one copy of the
-/// GPU's statistics; temperature is read at most every `temperatureInterval` seconds; the process
+/// GPU's statistics; processor and GPU temperatures are read at most every `temperatureInterval` seconds; the process
 /// table is only measured while someone looks at it (menu open or dashboard visible), with at most
 /// one request in flight.
 public final class SamplingEngine: Sendable {
@@ -34,6 +37,7 @@ public final class SamplingEngine: Sendable {
         let cpuTicks: @Sendable () -> CPUTicksSample?
         let temperature: @Sendable () -> TemperatureSummary?
         let gpuLoad: @Sendable () -> GPULoad?
+        let gpuTemperature: @Sendable () -> TemperatureSummary?
         let topProcesses: any TopProcessesProviding
         let topology: CPUTopology
 
@@ -41,12 +45,14 @@ public final class SamplingEngine: Sendable {
             cpuTicks: @escaping @Sendable () -> CPUTicksSample?,
             temperature: @escaping @Sendable () -> TemperatureSummary?,
             gpuLoad: @escaping @Sendable () -> GPULoad?,
+            gpuTemperature: @escaping @Sendable () -> TemperatureSummary?,
             topProcesses: any TopProcessesProviding,
             topology: CPUTopology
         ) {
             self.cpuTicks = cpuTicks
             self.temperature = temperature
             self.gpuLoad = gpuLoad
+            self.gpuTemperature = gpuTemperature
             self.topProcesses = topProcesses
             self.topology = topology
         }
@@ -156,8 +162,10 @@ public final class SamplingEngine: Sendable {
 
     private func readTemperature() {
         let temperature = sources.temperature()
+        let gpuTemperature = sources.gpuTemperature()
         state.withLock { state in
             state.snapshot.temperature = temperature
+            state.snapshot.gpuTemperature = gpuTemperature
             state.secondsSinceTemperature = 0
         }
     }

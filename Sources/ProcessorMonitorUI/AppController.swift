@@ -74,6 +74,7 @@ public final class AppController {
         let ticks = CPUTicksReader()
         let temperature = CPUTemperatureReader.live()
         let gpu = GPUReader()
+        let gpuTemperature = GPUTemperatureReader.live()
         let processes = TopProcessesService.live()
         let scheduler = DispatchScheduler(queue: DispatchQueue(label: "io.github.arrrlo.macos-processor-monitor.sampling", qos: .utility))
         return AppController(
@@ -91,6 +92,7 @@ public final class AppController {
                         cpuTicks: ticks.read,
                         temperature: temperature.read,
                         gpuLoad: gpu.read,
+                        gpuTemperature: gpuTemperature.read,
                         topProcesses: processes,
                         topology: topology
                     ),

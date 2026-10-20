@@ -44,7 +44,8 @@ extension MonitorSnapshot {
             ],
             scope: .allProcesses
         ),
-        gpuLoad: GPULoad(device: 0.18, renderer: 0.17, tiler: 0.12)
+        gpuLoad: GPULoad(device: 0.18, renderer: 0.17, tiler: 0.12),
+        gpuTemperature: TemperatureSummary(average: 42.2, maximum: 43.4, sensorCount: 8)
     )
 }
 

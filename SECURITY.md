@@ -31,8 +31,9 @@ Design decisions that keep the attack surface small:
   swapped by any admin user without a password prompt. The helper and its plist are owned by root
   and not writable by other users.
 - **No sandbox for the app.** The menu bar app needs `host_processor_info`, the HID temperature
-  sensors and the process table, which the App Sandbox blocks. It makes no network connections and
+  sensors, the SMC and the process table, which the App Sandbox blocks. It makes no network connections and
   stores a single preference (the refresh interval).
 
 The temperature readings use the private `IOHIDEventSystemClient` API. It is read-only and needs no
-special privileges.
+special privileges. The GPU temperature comes from the AppleSMC user client, which any user may
+open. The app only sends its read commands (list keys, key info, read a key), never a write.

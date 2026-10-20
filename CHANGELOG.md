@@ -11,6 +11,8 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 
 - This changelog. Release notes on GitHub now list the changes in each version.
 - GPU load in the menu bar (`23%  49°C   GPU 5%`) and in the menu.
+- GPU temperature in the menu bar (`23%  49°C   GPU 5%  42°C`) and in the menu, read from the SMC's
+  GPU sensors.
 
 ### Changed
 
@@ -20,6 +22,11 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 
 - The release `.sha256` file names the installer without a `build/` prefix, so
   `shasum -a 256 -c` verifies it next to the downloaded `.pkg`.
+
+### Internal
+
+- The test that the CPU tick buffer is unmapped no longer fails when a parallel test maps memory at
+  the freed address.
 
 ## [1.0.0] - 2026-10-19
 

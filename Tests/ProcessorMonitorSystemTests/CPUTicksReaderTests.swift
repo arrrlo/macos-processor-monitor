@@ -47,14 +47,19 @@ final class DeallocationLog: @unchecked Sendable {
         #expect(log.calls.first?.size == vm_size_t(values.count * MemoryLayout<integer_t>.stride))
     }
 
+    /// Retried because a test running in parallel can map new memory at the freed address between
+    /// the deallocation and the check. Without the deallocation the buffer stays mapped every time.
     @Test func liveDeallocationUnmapsTheKernelBuffer() throws {
         let live = CPUTicksReader.Source.live
-        let result = live.query()
-        let info = try #require(result.info)
-        let address = vm_address_t(bitPattern: info)
-        #expect(isMapped(address))
-        live.deallocate(address, vm_size_t(result.infoCount) * vm_size_t(MemoryLayout<integer_t>.stride))
-        #expect(!isMapped(address))
+        let unmapped = try (0..<5).contains { _ in
+            let result = live.query()
+            let info = try #require(result.info)
+            let address = vm_address_t(bitPattern: info)
+            #expect(isMapped(address))
+            live.deallocate(address, vm_size_t(result.infoCount) * vm_size_t(MemoryLayout<integer_t>.stride))
+            return !isMapped(address)
+        }
+        #expect(unmapped)
     }
 
     @Test func failedQueryReturnsNilWithoutDeallocating() {
