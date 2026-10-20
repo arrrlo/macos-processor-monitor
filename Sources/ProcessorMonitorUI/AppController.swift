@@ -21,6 +21,7 @@ public final class AppController {
     public typealias EngineFactory = (@escaping @Sendable (MonitorSnapshot) -> Void) -> SamplingEngine
 
     private let topology: CPUTopology
+    private let gpu: GPUInfo?
     private let settings: SettingsStore
     private let loginItem: LoginItemControlling
     private let identities: ProcessIdentityResolver
@@ -48,6 +49,7 @@ public final class AppController {
 
     public init(
         topology: CPUTopology,
+        gpu: GPUInfo? = nil,
         settings: SettingsStore,
         loginItem: LoginItemControlling,
         identities: ProcessIdentityResolver,
@@ -58,6 +60,7 @@ public final class AppController {
         makeEngine: @escaping EngineFactory
     ) {
         self.topology = topology
+        self.gpu = gpu
         self.settings = settings
         self.loginItem = loginItem
         self.identities = identities
@@ -79,6 +82,7 @@ public final class AppController {
         let scheduler = DispatchScheduler(queue: DispatchQueue(label: "io.github.arrrlo.macos-processor-monitor.sampling", qos: .utility))
         return AppController(
             topology: topology,
+            gpu: gpu.info(),
             settings: settings,
             loginItem: LaunchAgentLoginItem.live(),
             identities: .live(),
@@ -157,7 +161,7 @@ public final class AppController {
 
     private func refreshDashboard() {
         guard dashboard.isVisible else { return }
-        dashboard.update(DashboardModel(snapshot: latest, clusterNames: clusterNames, apps: resolveApps()))
+        dashboard.update(DashboardModel(snapshot: latest, clusterNames: clusterNames, apps: resolveApps(), gpu: gpu))
     }
 
     private func resolveApps() -> [Int32: AppInfo] {

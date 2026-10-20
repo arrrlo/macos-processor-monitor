@@ -33,6 +33,7 @@ extension AppKitTests {
             let topology = topology
             let controller = AppController(
                 topology: topology,
+                gpu: GPUInfo(name: "Apple M5 Max", coreCount: 32),
                 settings: settings,
                 loginItem: loginItem,
                 identities: ProcessIdentityResolver { _ in nil },
@@ -159,6 +160,8 @@ extension AppKitTests {
             // Opening shows the latest reading at once, without waiting for a tick.
             #expect(harness.controller.dashboard.model.snapshot.temperature?.average == 48.6)
             #expect(harness.controller.dashboard.model.clusterNames == ["Super", "Performance"])
+            #expect(harness.controller.dashboard.model.gpu == GPUInfo(name: "Apple M5 Max", coreCount: 32))
+            #expect(harness.controller.dashboard.model.snapshot.gpuTemperature?.average == 41.6)
             #expect(harness.sources.processes.requests == [10])
             harness.sources.processes.complete(with: MonitorSnapshot.sample.topProcesses!)
             await settle()

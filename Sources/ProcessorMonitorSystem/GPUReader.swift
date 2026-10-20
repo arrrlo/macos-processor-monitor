@@ -31,6 +31,13 @@ public final class GPUReader: Sendable {
         source.release(service)
     }
 
+    /// The chip's name and GPU core count. They never change, so this is read once at launch.
+    public func info() -> GPUInfo? {
+        guard let name = source.property(service, "model") as? String,
+              let cores = source.property(service, "gpu-core-count") as? Int else { return nil }
+        return GPUInfo(name: name, coreCount: cores)
+    }
+
     public func read() -> GPULoad? {
         GPUStatisticsParser.load(from: source.property(service, "PerformanceStatistics"))
     }

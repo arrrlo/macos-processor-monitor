@@ -14,11 +14,11 @@ e.g. `23%  49°C   GPU 5%  42°C`. Click it for every metric and the top process
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
-    <img src="docs/images/dashboard-light.png" width="600" alt="Dashboard with processor load, temperature, per-core occupancy of the Super and Performance clusters, and the top 10 processes">
+    <img src="docs/images/dashboard-light.png" width="600" alt="Dashboard with processor load, temperature, per-core occupancy of the Super and Performance clusters, GPU load and temperature, and the top 10 processes">
   </picture>
 </p>
 
-<sub>Live readings from an M5 Max (6 Super + 12 Performance cores), rendered by `make screenshots`.</sub>
+<sub>Live readings from an M5 Max (6 Super + 12 Performance cores, 32 GPU cores), rendered by `make screenshots`.</sub>
 
 ## Features
 
@@ -33,7 +33,7 @@ e.g. `23%  49°C   GPU 5%  42°C`. Click it for every metric and the top process
 - **GPU temperature**, the average and maximum of the GPU's sensors.
 - **Top 10 processes** by CPU usage, system-wide (including `WindowServer`, `kernel_task` and other
   system processes), with app names and icons.
-- **Dashboard window** with all of the above, plus a per-core chart.
+- **Dashboard window** with all of the above, plus a per-core chart and the GPU's name and core count.
 - **Starts at login**, with a refresh interval of 1, 2 or 5 seconds.
 - **Built to stay out of the way.** One timer with leeway so macOS can batch wake-ups. Processes are
   only measured while you look at them. Nothing runs while the displays sleep.

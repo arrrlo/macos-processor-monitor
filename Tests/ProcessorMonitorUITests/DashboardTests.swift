@@ -41,11 +41,13 @@ extension AppKitTests {
             let model = DashboardModel(
                 snapshot: .sample,
                 clusterNames: ["Super", "Performance"],
-                apps: [200: AppInfo(name: "Finder", icon: testIcon)]
+                apps: [200: AppInfo(name: "Finder", icon: testIcon)],
+                gpu: GPUInfo(name: "Apple M5 Max", coreCount: 32)
             )
             let size = render(model)
             #expect(size.width >= 560)
-            #expect(size.height > 300)
+            // Processor row, occupancy, GPU row and processes.
+            #expect(size.height > 780)
         }
 
         @Test func rendersPlaceholdersWithoutData() {
@@ -67,6 +69,17 @@ extension AppKitTests {
             #expect(DashboardModel.barWidth(0.5, of: 200) == 100)
             #expect(DashboardModel.barWidth(2, of: 200) == 200)
             #expect(DashboardModel.barWidth(-1, of: 200) == 0)
+        }
+
+        @Test func gpuPresentation() {
+            let model = DashboardModel(snapshot: .sample, clusterNames: [], apps: [:], gpu: GPUInfo(name: "Apple M5 Max", coreCount: 32))
+            #expect(model.gpu == GPUInfo(name: "Apple M5 Max", coreCount: 32))
+            #expect(model.gpuCaption == "Apple M5 Max · 32 GPU cores")
+            #expect(model.gpuSplit == "Renderer 17% · Tiler 12%")
+            let empty = DashboardModel(snapshot: .empty, clusterNames: [], apps: [:])
+            #expect(empty.gpu == nil)
+            #expect(empty.gpuCaption == "No GPU found")
+            #expect(empty.gpuSplit == "Renderer — · Tiler —")
         }
 
         @Test func coreBarsSpanTheFullCardWidth() {

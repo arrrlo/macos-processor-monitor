@@ -13,6 +13,8 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 - GPU load in the menu bar (`23%  49°C   GPU 5%`) and in the menu.
 - GPU temperature in the menu bar (`23%  49°C   GPU 5%  42°C`) and in the menu, read from the SMC's
   GPU sensors.
+- A GPU row in the dashboard: GPU load with its renderer and tiler shares, GPU temperature, and the
+  chip's name and GPU core count.
 
 ### Changed
 

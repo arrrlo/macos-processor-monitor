@@ -66,6 +66,18 @@ final class FakeGPURegistry: @unchecked Sendable {
         #expect(registry.reads.map(\.1) == ["PerformanceStatistics", "PerformanceStatistics"])
     }
 
+    @Test func readsTheGPUNameAndCoreCount() {
+        let registry = FakeGPURegistry()
+        registry.properties = ["model": "Apple M5 Max", "gpu-core-count": 32]
+        let reader = GPUReader(source: registry.source)
+        #expect(reader.info() == GPUInfo(name: "Apple M5 Max", coreCount: 32))
+        #expect(registry.reads.map(\.1) == ["model", "gpu-core-count"])
+        registry.properties["gpu-core-count"] = "32"
+        #expect(reader.info() == nil)
+        registry.properties = ["gpu-core-count": 32]
+        #expect(reader.info() == nil)
+    }
+
     @Test func releasesTheGPUWhenDone() {
         let registry = FakeGPURegistry()
         var reader: GPUReader? = GPUReader(source: registry.source)
@@ -75,8 +87,12 @@ final class FakeGPURegistry: @unchecked Sendable {
         #expect(registry.released == [42])
     }
 
-    /// Real Macs report 0...1; a VM has no GPU entry and reads nothing.
+    /// Real Macs report 0...1 and their core count; a VM has no GPU entry and reads nothing.
     @Test func liveReadIsAShareOrNothing() {
+        if let info = GPUReader().info() {
+            #expect(info.coreCount > 0)
+            #expect(!info.name.isEmpty)
+        }
         let load = GPUReader().read()
         if let load {
             #expect((0...1).contains(load.device))

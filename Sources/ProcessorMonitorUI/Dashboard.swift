@@ -6,11 +6,24 @@ public struct DashboardModel {
     public let snapshot: MonitorSnapshot
     public let clusterNames: [String]
     public let apps: [Int32: AppInfo]
+    public let gpu: GPUInfo?
 
-    public init(snapshot: MonitorSnapshot, clusterNames: [String], apps: [Int32: AppInfo]) {
+    public init(snapshot: MonitorSnapshot, clusterNames: [String], apps: [Int32: AppInfo], gpu: GPUInfo? = nil) {
         self.snapshot = snapshot
         self.clusterNames = clusterNames
         self.apps = apps
+        self.gpu = gpu
+    }
+
+    var gpuCaption: String {
+        guard let gpu else { return "No GPU found" }
+        return "\(gpu.name) · \(gpu.coreCount) GPU cores"
+    }
+
+    /// The GPU's two units. They overlap in time, so they are shown as text, not as parts of the bar.
+    var gpuSplit: String {
+        let load = snapshot.gpuLoad
+        return "Renderer \(MetricFormatter.percent(load?.renderer)) · Tiler \(MetricFormatter.percent(load?.tiler))"
     }
 
     var text: MenuText { MenuText(snapshot, clusterNames: clusterNames) }
@@ -45,9 +58,13 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 14) {
                 LoadCard(model: model)
-                TemperatureCard(summary: model.snapshot.temperature)
+                TemperatureCard(title: "Temperature", summary: model.snapshot.temperature, caption: "Processor die sensors")
             }
             OccupancyCard(model: model)
+            HStack(alignment: .top, spacing: 14) {
+                GPULoadCard(model: model)
+                TemperatureCard(title: "GPU temperature", summary: model.snapshot.gpuTemperature, caption: "GPU sensors")
+            }
             ProcessesCard(model: model)
         }
         .padding(Self.padding)
@@ -113,16 +130,39 @@ private struct Legend: View {
     }
 }
 
-private struct TemperatureCard: View {
-    let summary: TemperatureSummary?
+/// Whole-GPU load: macOS reports no per-core figure, so the GPU's cores are only counted in the caption.
+private struct GPULoadCard: View {
+    let model: DashboardModel
 
     var body: some View {
-        Card("Temperature") {
+        let device = model.snapshot.gpuLoad?.device
+        Card("GPU load") {
+            Text(MetricFormatter.percent(device)).font(.system(size: 40, weight: .semibold, design: .rounded)).monospacedDigit()
+            HStack(spacing: 0) {
+                Rectangle().fill(Color.accentColor).frame(width: DashboardModel.barWidth(device ?? 0, of: LoadCard.barWidth))
+                Spacer(minLength: 0)
+            }
+            .frame(width: LoadCard.barWidth, height: 10)
+            .background(Color.gray.opacity(0.25))
+            .clipShape(Capsule())
+            Text(model.gpuSplit).font(.callout).monospacedDigit().foregroundStyle(.secondary)
+            Text(model.gpuCaption).font(.caption).foregroundStyle(.tertiary)
+        }
+    }
+}
+
+private struct TemperatureCard: View {
+    let title: String
+    let summary: TemperatureSummary?
+    let caption: String
+
+    var body: some View {
+        Card(title) {
             Text(MetricFormatter.temperature(summary?.average)).font(.system(size: 40, weight: .semibold, design: .rounded)).monospacedDigit()
             Text(summary.map { "Max \(MetricFormatter.temperature($0.maximum)) · \($0.sensorCount) readings" } ?? "No sensors found")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Text("Processor die sensors").font(.caption).foregroundStyle(.tertiary)
+            Text(caption).font(.caption).foregroundStyle(.tertiary)
         }
     }
 }

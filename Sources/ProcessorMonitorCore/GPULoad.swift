@@ -14,3 +14,14 @@ public struct GPULoad: Equatable, Sendable {
         self.tiler = tiler
     }
 }
+
+/// The GPU's name and size, read once at launch.
+public struct GPUInfo: Equatable, Sendable {
+    public let name: String
+    public let coreCount: Int
+
+    public init(name: String, coreCount: Int) {
+        self.name = name
+        self.coreCount = coreCount
+    }
+}

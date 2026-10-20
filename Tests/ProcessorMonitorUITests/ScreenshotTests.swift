@@ -12,7 +12,7 @@ extension AppKitTests {
     struct ScreenshotTests {
         let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["PM_SCREENSHOT_DIR"] ?? "/tmp")
 
-        func liveSnapshot() async -> (MonitorSnapshot, CPUTopology) {
+        func liveSnapshot() async -> (MonitorSnapshot, CPUTopology, GPUInfo?) {
             let ticks = CPUTicksReader()
             let topology = TopologyReader().read(coreCount: ProcessInfo.processInfo.processorCount)
             let first = ticks.read()!
@@ -24,13 +24,16 @@ extension AppKitTests {
                 service.topProcesses(limit: 10) { continuation.resume(returning: $0) }
             }
             withExtendedLifetime(service) {}
+            let gpu = GPUReader()
             let snapshot = MonitorSnapshot(
                 load: load,
                 clusters: topology.clusterLoads(load),
                 temperature: CPUTemperatureReader.live().read(),
-                topProcesses: processes
+                topProcesses: processes,
+                gpuLoad: gpu.read(),
+                gpuTemperature: GPUTemperatureReader.live().read()
             )
-            return (snapshot, topology)
+            return (snapshot, topology, gpu.info())
         }
 
         func write(_ view: NSView, to name: String, appearance: NSAppearance.Name) throws {
@@ -43,9 +46,9 @@ extension AppKitTests {
         }
 
         @Test func dashboard() async throws {
-            let (snapshot, topology) = await liveSnapshot()
+            let (snapshot, topology, gpu) = await liveSnapshot()
             let apps = ProcessIdentityResolver.live().resolve(snapshot.topProcesses?.processes ?? [])
-            let model = DashboardModel(snapshot: snapshot, clusterNames: topology.clusters.map(\.name), apps: apps)
+            let model = DashboardModel(snapshot: snapshot, clusterNames: topology.clusters.map(\.name), apps: apps, gpu: gpu)
             for (name, appearance) in [("dashboard-dark.png", NSAppearance.Name.darkAqua), ("dashboard-light.png", .aqua)] {
                 let view = NSHostingView(rootView: DashboardView(model: model).background(Color(nsColor: .windowBackgroundColor)))
                 view.frame = NSRect(origin: .zero, size: view.fittingSize)
