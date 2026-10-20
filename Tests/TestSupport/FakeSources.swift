@@ -5,8 +5,10 @@ import ProcessorMonitorCore
 public final class FakeSources: @unchecked Sendable {
     public var ticks: [CPUTicksSample?] = []
     public var temperatures: [TemperatureSummary?] = []
+    public var gpuLoads: [GPULoad?] = []
     public private(set) var tickReads = 0
     public private(set) var temperatureReads = 0
+    public private(set) var gpuLoadReads = 0
     public let processes = FakeTopProcesses()
 
     public init() {}
@@ -30,6 +32,11 @@ public final class FakeSources: @unchecked Sendable {
     public func readTemperature() -> TemperatureSummary? {
         defer { temperatureReads += 1 }
         return temperatureReads < temperatures.count ? temperatures[temperatureReads] : temperatures.last ?? nil
+    }
+
+    public func readGPULoad() -> GPULoad? {
+        defer { gpuLoadReads += 1 }
+        return gpuLoadReads < gpuLoads.count ? gpuLoads[gpuLoadReads] : gpuLoads.last ?? nil
     }
 }
 

@@ -10,7 +10,7 @@ extension AppKitTests {
             let menu = NSMenu()
             let controller = StatusItemController(statusBar: bar, menu: menu)
             let button = try #require(controller.item.button)
-            #expect(button.title == "—  —")
+            #expect(button.title == "—  —   GPU —")
             #expect(controller.item.menu === menu)
             #expect(button.image != nil)
             #expect(button.font == StatusItemController.font)
@@ -18,11 +18,11 @@ extension AppKitTests {
 
             // A fixed length means a changing reading never resizes the item, which on macOS
             // re-lays out the menu bar and sends a scene update to the system on every tick.
-            let widest = ("100%  100°C" as NSString).size(withAttributes: [.font: StatusItemController.font]).width
+            let widest = ("100%  100°C   GPU 100%" as NSString).size(withAttributes: [.font: StatusItemController.font]).width
             #expect(controller.item.length == StatusItemController.length)
             #expect(StatusItemController.length >= widest + 16)
             #expect(StatusItemController.length <= widest + 40)
-            controller.update(title: "100%  100°C")
+            controller.update(title: "100%  100°C   GPU 100%")
             #expect(controller.item.length == StatusItemController.length)
             controller.update(title: "23%  49°C")
             controller.update(title: "23%  49°C")
@@ -52,6 +52,7 @@ extension AppKitTests {
             #expect(titles == [
                 "Processor load\t—", "User\t—", "System\t—", "Idle\t—", "Temperature\tUnavailable",
                 "Super cores\t—", "Performance cores\t—",
+                "GPU load\t—",
                 "---",
                 "Top processes — measuring…", "", "", "", "", "", "", "", "", "", "",
                 "---",
@@ -59,15 +60,15 @@ extension AppKitTests {
                 "---",
                 "About macOS Processor Monitor", "Quit macOS Processor Monitor",
             ])
-            // load, user, system, idle, temperature, 2 clusters, separator, header, 10 processes, …
-            #expect(menu.items.map(\.indentationLevel) == [0, 1, 1, 1, 0, 0, 0, 0, 0] + Array(repeating: 1, count: 10) + Array(repeating: 0, count: 7))
-            #expect(menu.items[9...18].allSatisfy { $0.isHidden })
-            #expect(menu.items[20].keyEquivalent == "d")
-            #expect(menu.items[25].keyEquivalent == "q")
-            #expect(menu.items[21].submenu?.items.map(\.title) == ["1 second", "2 seconds", "5 seconds"])
+            // load, user, system, idle, temperature, 2 clusters, GPU load, separator, header, 10 processes, …
+            #expect(menu.items.map(\.indentationLevel) == [0, 1, 1, 1, 0, 0, 0, 0, 0, 0] + Array(repeating: 1, count: 10) + Array(repeating: 0, count: 7))
+            #expect(menu.items[10...19].allSatisfy { $0.isHidden })
+            #expect(menu.items[21].keyEquivalent == "d")
+            #expect(menu.items[26].keyEquivalent == "q")
+            #expect(menu.items[22].submenu?.items.map(\.title) == ["1 second", "2 seconds", "5 seconds"])
             #expect(!menu.autoenablesItems)
             #expect(!menu.items[0].isEnabled)
-            #expect(menu.items[20].isEnabled)
+            #expect(menu.items[21].isEnabled)
         }
 
         @Test func updatesRowsInPlace() {
@@ -79,25 +80,26 @@ extension AppKitTests {
             #expect(menu.items[0].attributedTitle?.string == "Processor load\t23%")
             #expect(menu.items[4].attributedTitle?.string == "Temperature\t53°C (max 59°C)")
             #expect(menu.items[5].attributedTitle?.string == "Super cores\t60%")
-            #expect(menu.items[8].attributedTitle?.string == "Top processes")
-            #expect(menu.items[9].attributedTitle?.string == "WindowServer\t12.3%")
-            #expect(menu.items[9].image == nil)
-            #expect(menu.items[10].attributedTitle?.string == "Finder\t3.5%")
-            #expect(menu.items[10].image?.size == NSSize(width: 16, height: 16))
-            #expect(!menu.items[10].isHidden)
-            #expect(menu.items[11].isHidden)
+            #expect(menu.items[7].attributedTitle?.string == "GPU load\t18%")
+            #expect(menu.items[9].attributedTitle?.string == "Top processes")
+            #expect(menu.items[10].attributedTitle?.string == "WindowServer\t12.3%")
+            #expect(menu.items[10].image == nil)
+            #expect(menu.items[11].attributedTitle?.string == "Finder\t3.5%")
+            #expect(menu.items[11].image?.size == NSSize(width: 16, height: 16))
+            #expect(!menu.items[11].isHidden)
+            #expect(menu.items[12].isHidden)
         }
 
         @Test func itemsTriggerTheirActions() throws {
             let log = ActionLog()
             let controller = makeController(log: log)
             let menu = controller.menu
-            menu.performActionForItem(at: 20)
-            let submenu = try #require(menu.items[21].submenu)
+            menu.performActionForItem(at: 21)
+            let submenu = try #require(menu.items[22].submenu)
             submenu.performActionForItem(at: 2)
-            menu.performActionForItem(at: 22)
-            menu.performActionForItem(at: 24)
+            menu.performActionForItem(at: 23)
             menu.performActionForItem(at: 25)
+            menu.performActionForItem(at: 26)
             controller.menuWillOpen(menu)
             controller.menuDidClose(menu)
             #expect(log.entries == ["dashboard", "interval 5.0", "login", "about", "quit", "visible true", "visible false"])
@@ -107,21 +109,22 @@ extension AppKitTests {
             let controller = makeController(log: ActionLog())
             let menu = controller.menu
             controller.setInterval(.five)
-            let submenu = try #require(menu.items[21].submenu)
+            let submenu = try #require(menu.items[22].submenu)
             #expect(submenu.items.map(\.state) == [.off, .off, .on])
 
             controller.setLaunchAtLogin(enabled: true, available: true)
-            #expect(menu.items[22].state == .on)
-            #expect(menu.items[22].isEnabled)
+            #expect(menu.items[23].state == .on)
+            #expect(menu.items[23].isEnabled)
             controller.setLaunchAtLogin(enabled: false, available: false)
-            #expect(menu.items[22].state == .off)
-            #expect(!menu.items[22].isEnabled)
+            #expect(menu.items[23].state == .off)
+            #expect(!menu.items[23].isEnabled)
         }
 
         @Test func layoutAdaptsToTheClusterCount() {
             let menu = makeController(log: ActionLog(), clusters: ["CPU"]).menu
             #expect(menu.items[5].attributedTitle?.string == "CPU cores\t—")
-            #expect(menu.items[6].isSeparatorItem)
+            #expect(menu.items[6].attributedTitle?.string == "GPU load\t—")
+            #expect(menu.items[7].isSeparatorItem)
         }
     }
 }

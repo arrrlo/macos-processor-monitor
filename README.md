@@ -8,8 +8,8 @@ A lightweight, native menu bar monitor for Apple Silicon processors.
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black)
 ![Apple Silicon](https://img.shields.io/badge/arch-arm64-black)
 
-The menu bar shows the processor load and temperature next to a chip icon, e.g. `23%  49°C`.
-Click it for every metric and the top processes, or open the dashboard:
+The menu bar shows the processor load and temperature next to a chip icon, followed by the GPU
+load, e.g. `23%  49°C   GPU 5%`. Click it for every metric and the top processes, or open the dashboard:
 
 <p align="center">
   <picture>
@@ -22,11 +22,14 @@ Click it for every metric and the top processes, or open the dashboard:
 
 ## Features
 
-- **Menu bar item** with the current processor load and temperature, e.g. `23%  49°C`.
+- **Menu bar item** with the current processor load and temperature and the GPU load, e.g.
+  `23%  49°C   GPU 5%`.
 - **Processor load** with its user / system / idle split.
 - **Occupancy** of every core, grouped by core cluster. Cluster names come from the chip itself:
   *Super* and *Performance* on M5, *Performance* and *Efficiency* on earlier chips.
 - **Processor temperature**, the average and maximum of the chip's die sensors.
+- **GPU load**, the share of time the whole GPU is busy. macOS reports it for the GPU as a whole,
+  not per GPU core.
 - **Top 10 processes** by CPU usage, system-wide (including `WindowServer`, `kernel_task` and other
   system processes), with app names and icons.
 - **Dashboard window** with all of the above, plus a per-core chart.
@@ -69,6 +72,7 @@ Click the processor icon in the menu bar to see:
 - **Processor load** with user, system and idle shares
 - **Temperature**, average and maximum
 - **Occupancy** for each core cluster
+- **GPU load**
 - **Top processes**, the 10 processes using the most CPU. Values are a percentage of one core, as
   in Activity Monitor, so a process can exceed 100%.
 - **Open Dashboard…** (⌘D) opens the dashboard window.
@@ -92,6 +96,7 @@ sudo "/Applications/macOS Processor Monitor.app/Contents/Resources/uninstall.sh"
 | Load and per-core occupancy | `host_processor_info(PROCESSOR_CPU_LOAD_INFO)`. Per-core tick counters are compared between samples. |
 | Core clusters | `hw.perflevelN.*` sysctls, plus each core's cluster type from `IODeviceTree:/cpus` (core numbering does not follow cluster order). |
 | Temperature | Die temperature sensors read through the IOHID event system (`PMU tdie*` on M5; per-cluster sensors on chips that have them). |
+| GPU load | `Device Utilization %` from the `PerformanceStatistics` the graphics driver keeps on its IORegistry entry (`AGXAccelerator`). Reading it is one property copy per tick. |
 | Top processes | `proc_pidinfo(PROC_PIDTASKALLINFO)` CPU time deltas for every process. |
 
 **Why a root helper?** macOS only lets administrators read the CPU time of other users'
@@ -109,7 +114,7 @@ request. If it is missing, the app falls back to your own processes and says so.
 | Memory | **14 MB** physical footprint after launch, about 27 MB after an hour of use |
 | Helper | Not running. It starts when the menu or dashboard needs process data (about 7 MB) and quits 30 s later. |
 
-To keep the redraw cost down, the menu bar text redraws as soon as load moves by 3 points or temperature by 2 °C, and otherwise at most every 10 seconds. The menu and dashboard always show exact values. One timer drives everything, with leeway so macOS can batch wake-ups. Temperature is read at most every 4 s, processes only while you look at them, and nothing runs while the displays sleep.
+To keep the redraw cost down, the menu bar text redraws as soon as processor load moves by 3 points, GPU load by 10 points or temperature by 2 °C, and otherwise at most every 10 seconds. GPU load gets the larger step because it flickers between 0% and about 25% from one second to the next while windows are drawn. The menu and dashboard always show exact values. One timer drives everything, with leeway so macOS can batch wake-ups. Temperature is read at most every 4 s, processes only while you look at them, and nothing runs while the displays sleep.
 
 ## Privacy
 

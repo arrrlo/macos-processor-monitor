@@ -6,35 +6,47 @@ public struct MonitorSnapshot: Equatable, Sendable {
     public var clusters: [ClusterLoad]
     public var temperature: TemperatureSummary?
     public var topProcesses: TopProcessesResult?
+    public var gpuLoad: GPULoad?
 
-    public init(load: CPULoad?, clusters: [ClusterLoad], temperature: TemperatureSummary?, topProcesses: TopProcessesResult?) {
+    public init(
+        load: CPULoad?,
+        clusters: [ClusterLoad],
+        temperature: TemperatureSummary?,
+        topProcesses: TopProcessesResult?,
+        gpuLoad: GPULoad? = nil
+    ) {
         self.load = load
         self.clusters = clusters
         self.temperature = temperature
         self.topProcesses = topProcesses
+        self.gpuLoad = gpuLoad
     }
 
     public static let empty = MonitorSnapshot(load: nil, clusters: [], temperature: nil, topProcesses: nil)
 }
 
-/// The app's only periodic work. Each tick costs one `host_processor_info` call; temperature is
-/// read at most every `temperatureInterval` seconds; the process table is only measured while
-/// someone looks at it (menu open or dashboard visible), with at most one request in flight.
+/// The app's only periodic work. Each tick costs one `host_processor_info` call and one copy of the
+/// GPU's statistics; temperature is read at most every `temperatureInterval` seconds; the process
+/// table is only measured while someone looks at it (menu open or dashboard visible), with at most
+/// one request in flight.
 public final class SamplingEngine: Sendable {
     public struct Sources: Sendable {
         let cpuTicks: @Sendable () -> CPUTicksSample?
         let temperature: @Sendable () -> TemperatureSummary?
+        let gpuLoad: @Sendable () -> GPULoad?
         let topProcesses: any TopProcessesProviding
         let topology: CPUTopology
 
         public init(
             cpuTicks: @escaping @Sendable () -> CPUTicksSample?,
             temperature: @escaping @Sendable () -> TemperatureSummary?,
+            gpuLoad: @escaping @Sendable () -> GPULoad?,
             topProcesses: any TopProcessesProviding,
             topology: CPUTopology
         ) {
             self.cpuTicks = cpuTicks
             self.temperature = temperature
+            self.gpuLoad = gpuLoad
             self.topProcesses = topProcesses
             self.topology = topology
         }
@@ -117,7 +129,7 @@ public final class SamplingEngine: Sendable {
     }
 
     private func tick() {
-        updateLoad(with: sources.cpuTicks())
+        updateLoad(with: sources.cpuTicks(), gpu: sources.gpuLoad())
         let temperatureDue = state.withLock { state -> Bool in
             state.secondsSinceTemperature += state.interval
             return state.secondsSinceTemperature >= temperatureInterval
@@ -129,9 +141,10 @@ public final class SamplingEngine: Sendable {
         publishSnapshot()
     }
 
-    private func updateLoad(with ticks: CPUTicksSample?) {
+    private func updateLoad(with ticks: CPUTicksSample?, gpu: GPULoad?) {
         let topology = sources.topology
         state.withLock { state in
+            state.snapshot.gpuLoad = gpu
             guard let ticks else { return }
             if let previous = state.previousTicks, let load = LoadCalculator.load(from: previous, to: ticks) {
                 state.snapshot.load = load

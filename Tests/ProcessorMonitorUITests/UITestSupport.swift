@@ -43,7 +43,8 @@ extension MonitorSnapshot {
                 ProcessUsage(pid: 200, name: "Finder", cpuPercent: 3.5),
             ],
             scope: .allProcesses
-        )
+        ),
+        gpuLoad: GPULoad(device: 0.18, renderer: 0.17, tiler: 0.12)
     )
 }
 

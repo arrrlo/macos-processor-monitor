@@ -21,9 +21,9 @@ public enum MetricFormatter {
         return String(format: "%.1f%%", tenths)
     }
 
-    /// The menu bar text, e.g. "23%  49°C".
+    /// The menu bar text: processor, then GPU, e.g. "23%  49°C   GPU 5%".
     public static func statusTitle(_ snapshot: MonitorSnapshot) -> String {
-        "\(percent(snapshot.load?.overall.total))  \(temperature(snapshot.temperature?.average))"
+        "\(percent(snapshot.load?.overall.total))  \(temperature(snapshot.temperature?.average))   GPU \(percent(snapshot.gpuLoad?.device))"
     }
 }
 
@@ -55,6 +55,7 @@ public struct MenuText: Equatable, Sendable {
     public let idle: Row
     public let temperature: Row
     public let clusters: [Row]
+    public let gpuLoad: Row
     public let processHeader: String
     public let processes: [ProcessRow]
 
@@ -69,6 +70,7 @@ public struct MenuText: Equatable, Sendable {
         clusters = clusterNames.map { name in
             Row(title: "\(name) cores", value: MetricFormatter.percent(snapshot.clusters.first { $0.name == name }?.average))
         }
+        gpuLoad = Row(title: "GPU load", value: MetricFormatter.percent(snapshot.gpuLoad?.device))
         processHeader = Self.processHeader(snapshot.topProcesses?.scope)
         processes = (snapshot.topProcesses?.processes ?? []).map {
             ProcessRow(pid: $0.pid, row: Row(title: $0.name, value: MetricFormatter.processPercent($0.cpuPercent)))
@@ -146,24 +148,44 @@ public final class ProcessDemand {
 }
 
 /// Decides when the menu bar text is worth redrawing. On macOS 26 every status item change costs
-/// about 7 ms of AppKit work (a snapshot redrawn into each display's menu bar), which dominates
+/// about 7–14 ms of AppKit work (a snapshot redrawn into each display's menu bar), which dominates
 /// the app's running cost. Real movement shows at once; jitter waits until the title is 10 s old.
 public struct StatusTitleThrottle: Sendable {
     public static let loadStep = 0.03
     public static let temperatureStep = 2.0
+    /// GPU load flickers between 0% and about 25% from one tick to the next while windows are
+    /// composited; at the processor's 3 points the title would redraw almost every tick.
+    public static let gpuLoadStep = 0.1
     public static let maximumAge = 10.0
 
-    private var shown: (load: Double?, temperature: Double?, time: Double)?
+    /// The numbers behind the title, kept so the next reading can be compared with them.
+    private struct Reading {
+        let load: Double?
+        let temperature: Double?
+        let gpuLoad: Double?
+
+        init(_ snapshot: MonitorSnapshot) {
+            load = snapshot.load?.overall.total
+            temperature = snapshot.temperature?.average
+            gpuLoad = snapshot.gpuLoad?.device
+        }
+
+        func moved(from old: Reading) -> Bool {
+            StatusTitleThrottle.moved(old.load, load, by: StatusTitleThrottle.loadStep)
+                || StatusTitleThrottle.moved(old.temperature, temperature, by: StatusTitleThrottle.temperatureStep)
+                || StatusTitleThrottle.moved(old.gpuLoad, gpuLoad, by: StatusTitleThrottle.gpuLoadStep)
+        }
+    }
+
+    private var shown: (reading: Reading, time: Double)?
 
     public init() {}
 
     /// Records the reading as shown when it returns true.
-    public mutating func shouldShow(load: Double?, temperature: Double?, at time: Double) -> Bool {
-        guard let last = shown,
-              time - last.time < Self.maximumAge,
-              !Self.moved(last.load, load, by: Self.loadStep),
-              !Self.moved(last.temperature, temperature, by: Self.temperatureStep) else {
-            shown = (load, temperature, time)
+    public mutating func shouldShow(_ snapshot: MonitorSnapshot, at time: Double) -> Bool {
+        let reading = Reading(snapshot)
+        guard let last = shown, time - last.time < Self.maximumAge, !reading.moved(from: last.reading) else {
+            shown = (reading, time)
             return true
         }
         return false

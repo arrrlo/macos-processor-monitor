@@ -73,6 +73,7 @@ public final class AppController {
         let settings = UserDefaultsSettings(defaults: .standard)
         let ticks = CPUTicksReader()
         let temperature = CPUTemperatureReader.live()
+        let gpu = GPUReader()
         let processes = TopProcessesService.live()
         let scheduler = DispatchScheduler(queue: DispatchQueue(label: "io.github.arrrlo.macos-processor-monitor.sampling", qos: .utility))
         return AppController(
@@ -89,6 +90,7 @@ public final class AppController {
                     sources: SamplingEngine.Sources(
                         cpuTicks: ticks.read,
                         temperature: temperature.read,
+                        gpuLoad: gpu.read,
                         topProcesses: processes,
                         topology: topology
                     ),
@@ -138,7 +140,7 @@ public final class AppController {
 
     func render(_ snapshot: MonitorSnapshot) {
         latest = snapshot
-        if titleThrottle.shouldShow(load: snapshot.load?.overall.total, temperature: snapshot.temperature?.average, at: now()) {
+        if titleThrottle.shouldShow(snapshot, at: now()) {
             statusItem.update(title: MetricFormatter.statusTitle(snapshot))
         }
         refreshMenu()

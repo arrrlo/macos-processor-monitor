@@ -39,6 +39,7 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
     private let idleItem = StatusMenuController.infoItem(indented: true)
     private let temperatureItem = StatusMenuController.infoItem()
     private let clusterItems: [NSMenuItem]
+    private let gpuLoadItem = StatusMenuController.infoItem()
     private let processHeaderItem = StatusMenuController.infoItem()
     private let processItems: [NSMenuItem]
     private let intervalItems: [NSMenuItem]
@@ -70,6 +71,7 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.delegate = self
         [loadItem, userItem, systemItem, idleItem, temperatureItem].forEach(menu.addItem)
         clusterItems.forEach(menu.addItem)
+        menu.addItem(gpuLoadItem)
         menu.addItem(.separator())
         menu.addItem(processHeaderItem)
         processItems.forEach(menu.addItem)
@@ -104,6 +106,7 @@ public final class StatusMenuController: NSObject, NSMenuDelegate {
         for (item, row) in zip(clusterItems, text.clusters) {
             item.attributedTitle = MenuStyle.row(row)
         }
+        gpuLoadItem.attributedTitle = MenuStyle.row(text.gpuLoad)
         processHeaderItem.attributedTitle = MenuStyle.header(text.processHeader)
         updateProcesses(text.processes, apps: apps)
     }

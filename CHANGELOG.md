@@ -10,6 +10,7 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 ### Added
 
 - This changelog. Release notes on GitHub now list the changes in each version.
+- GPU load in the menu bar (`23%  49°C   GPU 5%`) and in the menu.
 
 ### Changed
 

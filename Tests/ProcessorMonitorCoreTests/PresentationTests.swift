@@ -22,12 +22,13 @@ import Testing
         #expect(MetricFormatter.processPercent(250.4) == "250%")
     }
 
-    @Test func statusTitleShowsLoadAndTemperature() {
+    @Test func statusTitleShowsProcessorThenGPU() {
         var snapshot = MonitorSnapshot.empty
-        #expect(MetricFormatter.statusTitle(snapshot) == "—  —")
+        #expect(MetricFormatter.statusTitle(snapshot) == "—  —   GPU —")
         snapshot.load = CPULoad(overall: LoadBreakdown(user: 0.2, system: 0.03, idle: 0.77), cores: [])
         snapshot.temperature = TemperatureSummary(average: 48.6, maximum: 60, sensorCount: 3)
-        #expect(MetricFormatter.statusTitle(snapshot) == "23%  49°C")
+        snapshot.gpuLoad = GPULoad(device: 0.054, renderer: 0.05, tiler: 0.01)
+        #expect(MetricFormatter.statusTitle(snapshot) == "23%  49°C   GPU 5%")
     }
 }
 
@@ -36,7 +37,8 @@ import Testing
         load: CPULoad(overall: LoadBreakdown(user: 0.15, system: 0.08, idle: 0.77), cores: []),
         clusters: [ClusterLoad(name: "Super", average: 0.4, cores: []), ClusterLoad(name: "Performance", average: 0.12, cores: [])],
         temperature: TemperatureSummary(average: 53.2, maximum: 58.9, sensorCount: 42),
-        topProcesses: TopProcessesResult(processes: [ProcessUsage(pid: 7, name: "WindowServer", cpuPercent: 12.34)], scope: .allProcesses)
+        topProcesses: TopProcessesResult(processes: [ProcessUsage(pid: 7, name: "WindowServer", cpuPercent: 12.34)], scope: .allProcesses),
+        gpuLoad: GPULoad(device: 0.18, renderer: 0.17, tiler: 0.12)
     )
 
     @Test func metricRows() {
@@ -50,6 +52,7 @@ import Testing
             MenuText.Row(title: "Super cores", value: "40%"),
             MenuText.Row(title: "Performance cores", value: "12%"),
         ])
+        #expect(text.gpuLoad == MenuText.Row(title: "GPU load", value: "18%"))
         #expect(text.processes == [MenuText.ProcessRow(pid: 7, row: MenuText.Row(title: "WindowServer", value: "12.3%"))])
         #expect(text.processHeader == "Top processes")
     }
@@ -62,6 +65,7 @@ import Testing
         #expect(text.idle.value == "—")
         #expect(text.temperature.value == "Unavailable")
         #expect(text.clusters == [MenuText.Row(title: "Super cores", value: "—")])
+        #expect(text.gpuLoad.value == "—")
         #expect(text.processes.isEmpty)
         #expect(text.processHeader == "Top processes — measuring…")
     }

@@ -23,6 +23,7 @@ extension AppKitTests {
             let sources = FakeSources()
             sources.ticks = FakeSources.ticks(busy: [25, 50, 75])
             sources.temperatures = [TemperatureSummary(average: 48.6, maximum: 52, sensorCount: 1)]
+            sources.gpuLoads = [GPULoad(device: 0.05, renderer: 0.04, tiler: 0.01)]
             let scheduler = FakeScheduler()
             let settings = InMemorySettings()
             let loginItem = FakeLoginItem()
@@ -47,6 +48,7 @@ extension AppKitTests {
                         sources: SamplingEngine.Sources(
                             cpuTicks: sources.readTicks,
                             temperature: sources.readTemperature,
+                            gpuLoad: sources.readGPULoad,
                             topProcesses: sources.processes,
                             topology: topology
                         ),
@@ -65,10 +67,10 @@ extension AppKitTests {
             #expect(harness.controller.isRunning)
             await settle()
             let button = try #require(harness.controller.statusItem.item.button)
-            #expect(button.title == "—  49°C")
+            #expect(button.title == "—  49°C   GPU —")
             harness.scheduler.advance(by: 2)
             await settle()
-            #expect(button.title == "25%  49°C")
+            #expect(button.title == "25%  49°C   GPU 5%")
             harness.controller.stop()
             #expect(!harness.controller.isRunning)
             #expect(button.window?.isVisible == false)
@@ -81,13 +83,13 @@ extension AppKitTests {
             harness.scheduler.advance(by: 2)
             await settle()
             let button = try #require(harness.controller.statusItem.item.button)
-            #expect(button.title == "25%  49°C")
+            #expect(button.title == "25%  49°C   GPU 5%")
             harness.scheduler.advance(by: 2)
             await settle()
-            #expect(button.title == "25%  49°C")
+            #expect(button.title == "25%  49°C   GPU 5%")
             harness.scheduler.advance(by: 10)
             await settle()
-            #expect(button.title == "26%  49°C")
+            #expect(button.title == "26%  49°C   GPU 5%")
             harness.controller.stop()
         }
 
@@ -99,8 +101,8 @@ extension AppKitTests {
             #expect(harness.sources.processes.requests == [10])
             harness.sources.processes.complete(with: MonitorSnapshot.sample.topProcesses!)
             await settle()
-            #expect(menu.items[8].attributedTitle?.string == "Top processes")
-            #expect(menu.items[9].attributedTitle?.string == "WindowServer\t12.3%")
+            #expect(menu.items[9].attributedTitle?.string == "Top processes")
+            #expect(menu.items[10].attributedTitle?.string == "WindowServer\t12.3%")
 
             harness.controller.menu.menuDidClose(menu)
             harness.scheduler.advance(by: 2)
@@ -125,9 +127,9 @@ extension AppKitTests {
             let harness = makeHarness()
             harness.controller.start()
             let menu = harness.controller.menu.menu
-            #expect(menu.items[22].state == .on)
+            #expect(menu.items[23].state == .on)
 
-            let submenu = try #require(menu.items[21].submenu)
+            let submenu = try #require(menu.items[22].submenu)
             #expect(submenu.items[1].state == .on)
             #expect(harness.scheduler.pending.map(\.interval) == [2])
             submenu.performActionForItem(at: 0)
@@ -135,12 +137,12 @@ extension AppKitTests {
             #expect(submenu.items[0].state == .on)
             #expect(harness.scheduler.pending.map(\.interval) == [1])
 
-            menu.performActionForItem(at: 22)
+            menu.performActionForItem(at: 23)
             #expect(harness.loginItem.changes == [false])
-            #expect(menu.items[22].state == .off)
+            #expect(menu.items[23].state == .off)
 
-            menu.performActionForItem(at: 24)
             menu.performActionForItem(at: 25)
+            menu.performActionForItem(at: 26)
             #expect(harness.log.entries == ["about", "quit"])
             harness.controller.stop()
         }
@@ -149,7 +151,7 @@ extension AppKitTests {
             let harness = makeHarness()
             harness.controller.start()
             await settle()
-            harness.controller.menu.menu.performActionForItem(at: 20)
+            harness.controller.menu.menu.performActionForItem(at: 21)
             #expect(harness.log.entries == ["activate"])
             let window = try #require(harness.controller.dashboard.window)
             // Opening shows the latest reading at once, without waiting for a tick.

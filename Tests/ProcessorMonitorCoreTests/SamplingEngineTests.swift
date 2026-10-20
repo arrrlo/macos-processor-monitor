@@ -18,6 +18,7 @@ final class Published: @unchecked Sendable {
             sources: SamplingEngine.Sources(
                 cpuTicks: sources.readTicks,
                 temperature: sources.readTemperature,
+                gpuLoad: sources.readGPULoad,
                 topProcesses: sources.processes,
                 topology: topology
             ),
@@ -61,6 +62,28 @@ final class Published: @unchecked Sendable {
         #expect(published.last?.temperature == hot)
         scheduler.advance(by: 4)
         #expect(sources.temperatureReads == 3)
+    }
+
+    @Test func gpuLoadIsReadOnEveryTick() {
+        let busy = GPULoad(device: 0.4, renderer: 0.3, tiler: 0.1)
+        let idle = GPULoad(device: 0, renderer: 0, tiler: 0)
+        let sources = FakeSources()
+        sources.gpuLoads = [busy, idle, nil]
+        let scheduler = FakeScheduler()
+        let published = Published()
+        let engine = makeEngine(sources, scheduler, published: published)
+
+        engine.start()
+        #expect(sources.gpuLoadReads == 0)
+        #expect(published.last?.gpuLoad == nil)
+        scheduler.advance(by: 2)
+        #expect(published.last?.gpuLoad == busy)
+        scheduler.advance(by: 2)
+        #expect(published.last?.gpuLoad == idle)
+        // A tick without CPU ticks still updates the GPU, and a failed read clears it.
+        scheduler.advance(by: 2)
+        #expect(published.last?.gpuLoad == nil)
+        #expect(sources.gpuLoadReads == 3)
     }
 
     @Test func slowIntervalsReadTemperatureEveryTick() {
@@ -190,5 +213,6 @@ final class Published: @unchecked Sendable {
 
     @Test func emptySnapshot() {
         #expect(MonitorSnapshot.empty == MonitorSnapshot(load: nil, clusters: [], temperature: nil, topProcesses: nil))
+        #expect(MonitorSnapshot.empty.gpuLoad == nil)
     }
 }
