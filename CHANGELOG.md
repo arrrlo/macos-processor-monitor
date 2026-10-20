@@ -29,6 +29,8 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 
 ### Internal
 
+- The sampling engine keeps the last 30 GPU load readings for the dashboard, cleared on every start
+  and interval change.
 - The test that the CPU tick buffer is unmapped no longer fails when a parallel test maps memory at
   the freed address.
 

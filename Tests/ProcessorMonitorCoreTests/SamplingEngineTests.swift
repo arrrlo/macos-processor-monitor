@@ -109,6 +109,38 @@ final class Published: @unchecked Sendable {
         #expect(published.last?.temperature == warm)
     }
 
+    @Test func gpuHistoryCollectsEverySuccessfulRead() {
+        let sources = FakeSources()
+        sources.gpuLoads = [0.1, 0.2, nil, 0.4].map { $0.map { GPULoad(device: $0, renderer: 0, tiler: 0) } }
+        let scheduler = FakeScheduler()
+        let published = Published()
+        let engine = makeEngine(sources, scheduler, published: published)
+        engine.start()
+        #expect(published.last?.gpuHistory.values == [])
+        scheduler.advance(by: 8)
+        #expect(published.last?.gpuHistory.values == [0.1, 0.2, 0.4])
+    }
+
+    /// A fresh start (display wake) or a new interval would otherwise draw a gap or mixed spacing.
+    @Test func gpuHistoryRestartsWithTheEngineAndOnANewInterval() {
+        let sources = FakeSources()
+        sources.gpuLoads = [GPULoad(device: 0.3, renderer: 0, tiler: 0)]
+        let scheduler = FakeScheduler()
+        let published = Published()
+        let engine = makeEngine(sources, scheduler, published: published)
+        engine.start()
+        scheduler.advance(by: 4)
+        #expect(published.last?.gpuHistory.values == [0.3, 0.3])
+        engine.stop()
+        engine.start()
+        #expect(published.last?.gpuHistory.values == [])
+        scheduler.advance(by: 2)
+        #expect(published.last?.gpuHistory.values == [0.3])
+        engine.setInterval(1)
+        scheduler.advance(by: 1)
+        #expect(published.last?.gpuHistory.values == [0.3])
+    }
+
     @Test func slowIntervalsReadTemperatureEveryTick() {
         let sources = FakeSources()
         sources.ticks = FakeSources.ticks(busy: [1, 2])
@@ -238,5 +270,6 @@ final class Published: @unchecked Sendable {
         #expect(MonitorSnapshot.empty == MonitorSnapshot(load: nil, clusters: [], temperature: nil, topProcesses: nil))
         #expect(MonitorSnapshot.empty.gpuLoad == nil)
         #expect(MonitorSnapshot.empty.gpuTemperature == nil)
+        #expect(MonitorSnapshot.empty.gpuHistory == GPULoadHistory())
     }
 }

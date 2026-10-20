@@ -25,3 +25,24 @@ public struct GPUInfo: Equatable, Sendable {
         self.coreCount = coreCount
     }
 }
+
+/// The latest whole-GPU load readings, oldest first, for the dashboard's activity bars. macOS has no
+/// per-core GPU load, so the GPU's counterpart of the core bars is load over time.
+public struct GPULoadHistory: Equatable, Sendable {
+    /// A minute at the default 2 s interval.
+    public static let capacity = 30
+    public let values: [Double]
+
+    public init() {
+        values = []
+    }
+
+    private init(values: some Collection<Double>) {
+        self.values = Array(values)
+    }
+
+    /// The history with `load` added, dropping the oldest reading once `capacity` are kept.
+    public func appending(_ load: Double) -> GPULoadHistory {
+        GPULoadHistory(values: (values + [load]).suffix(Self.capacity))
+    }
+}

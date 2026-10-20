@@ -8,6 +8,7 @@ public struct MonitorSnapshot: Equatable, Sendable {
     public var topProcesses: TopProcessesResult?
     public var gpuLoad: GPULoad?
     public var gpuTemperature: TemperatureSummary?
+    public var gpuHistory = GPULoadHistory()
 
     public init(
         load: CPULoad?,
@@ -94,11 +95,13 @@ public final class SamplingEngine: Sendable {
     public var interval: Double { state.withLock { $0.interval } }
     public var isRunning: Bool { state.withLock { $0.timer != nil } }
 
-    /// Takes a fresh baseline (so a pause is not averaged into the next reading) and starts ticking.
+    /// Takes a fresh baseline (so a pause is not averaged into the next reading, nor drawn as idle GPU
+    /// history) and starts ticking.
     public func start() {
         let started = state.withLock { state -> Bool in
             guard state.timer == nil else { return false }
             state.previousTicks = sources.cpuTicks()
+            state.snapshot.gpuHistory = GPULoadHistory()
             state.timer = scheduleTicks(every: state.interval)
             return true
         }
@@ -117,6 +120,7 @@ public final class SamplingEngine: Sendable {
     public func setInterval(_ seconds: Double) {
         state.withLock { state in
             state.interval = seconds
+            state.snapshot.gpuHistory = GPULoadHistory()
             guard let running = state.timer else { return }
             running.cancel()
             state.timer = scheduleTicks(every: seconds)
@@ -151,6 +155,9 @@ public final class SamplingEngine: Sendable {
         let topology = sources.topology
         state.withLock { state in
             state.snapshot.gpuLoad = gpu
+            if let gpu {
+                state.snapshot.gpuHistory = state.snapshot.gpuHistory.appending(gpu.device)
+            }
             guard let ticks else { return }
             if let previous = state.previousTicks, let load = LoadCalculator.load(from: previous, to: ticks) {
                 state.snapshot.load = load
