@@ -7,12 +7,13 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-20
+
 ### Added
 
 - This changelog. Release notes on GitHub now list the changes in each version.
-- GPU load in the menu bar (`23%  49°C   GPU 5%`) and in the menu.
-- GPU temperature in the menu bar (`23%  49°C   GPU 5%  42°C`) and in the menu, read from the SMC's
-  GPU sensors.
+- GPU load and temperature in the menu bar (`CPU 23%  49°C   GPU 5%  42°C`) and in the menu. The
+  temperature is read from the SMC's GPU sensors.
 - A GPU row in the dashboard: GPU load with its renderer and tiler shares, GPU temperature, and the
   chip's name and GPU core count.
 - The GPU's top 10 processes in the dashboard, by share of GPU time, for every user's processes.
@@ -56,5 +57,6 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 - Starts at login, with a refresh interval of 1, 2 or 5 seconds.
 - Installer package (`.pkg`) built and published by GitHub Actions.
 
-[Unreleased]: https://github.com/arrrlo/macos-processor-monitor/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/arrrlo/macos-processor-monitor/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/arrrlo/macos-processor-monitor/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/arrrlo/macos-processor-monitor/releases/tag/v1.0.0
