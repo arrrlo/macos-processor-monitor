@@ -144,7 +144,11 @@ extension AppKitTests {
             #expect(window.styleMask == [.titled, .closable, .miniaturizable])
             #expect(window.frame.height > 300)
             let screen = try #require(window.screen ?? NSScreen.main)
-            #expect(abs(window.frame.midX - screen.visibleFrame.midX) <= 1)
+            // Centred wherever it fits: every Apple Silicon Mac's default resolution is at least 1440 pt
+            // wide. A CI VM's virtual display is narrower than the 1340 pt dashboard and cannot centre it.
+            if window.frame.width <= screen.visibleFrame.width {
+                #expect(abs(window.frame.midX - screen.visibleFrame.midX) <= 1)
+            }
             #expect(controller.isVisible)
             #expect(controller.model.snapshot == .sample)
             controller.show()

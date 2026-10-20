@@ -110,7 +110,7 @@ public final class GPUProcessesService: TopProcessesProviding {
     }
 
     public static func live() -> GPUProcessesService {
-        GPUProcessesService(sampler: .gpu(), executablePath: ProcessNames.executablePath)
+        GPUProcessesService(sampler: .gpu(), executablePath: ProcessNames.liveExecutablePath)
     }
 
     /// Processes that did not use the GPU in the window are left out, so an idle GPU lists nothing.

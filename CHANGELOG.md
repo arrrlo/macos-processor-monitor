@@ -42,6 +42,10 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
   GPU time the graphics driver records for each process. No helper is needed.
 - The test that the CPU tick buffer is unmapped no longer fails when a parallel test maps memory at
   the freed address.
+- The dashboard window test checks centring only on screens wide enough for the window, so it passes
+  on the CI VM's narrow virtual display.
+- Coverage of the GPU process list no longer depends on the GPU being busy during the tests (CI has
+  no GPU).
 
 ## [1.0.0] - 2026-10-19
 

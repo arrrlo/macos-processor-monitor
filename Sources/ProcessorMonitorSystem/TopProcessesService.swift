@@ -35,7 +35,7 @@ public final class TopProcessesService: TopProcessesProviding {
     }
 
     public static func live() -> TopProcessesService {
-        TopProcessesService(helper: HelperClient.privileged().topProcesses, local: .live(), executablePath: ProcessNames.executablePath)
+        TopProcessesService(helper: HelperClient.privileged().topProcesses, local: .live(), executablePath: ProcessNames.liveExecutablePath)
     }
 
     public func topProcesses(limit: Int, completion: @escaping @Sendable (TopProcessesResult) -> Void) {

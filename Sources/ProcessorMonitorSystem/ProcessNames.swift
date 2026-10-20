@@ -13,6 +13,10 @@ public enum ProcessNames {
         }
     }
 
+    /// `executablePath` as one closure value for every service. A function reference passed as a
+    /// closure gets a thunk per use site, and the GPU list's would only run while the GPU is busy.
+    static let liveExecutablePath: @Sendable (Int32) -> String? = { executablePath($0) }
+
     /// `nil` for processes without an executable (kernel_task) or that no longer exist.
     static func executablePath(_ pid: Int32) -> String? {
         // PROC_PIDPATHINFO_MAXSIZE (4 × MAXPATHLEN) is not imported into Swift.
