@@ -21,9 +21,9 @@ public enum MetricFormatter {
         return String(format: "%.1f%%", tenths)
     }
 
-    /// The menu bar text: processor, then GPU, e.g. "23%  49°C   GPU 5%  42°C".
+    /// The menu bar text: processor, then GPU, e.g. "CPU 23%  49°C   GPU 5%  42°C".
     public static func statusTitle(_ snapshot: MonitorSnapshot) -> String {
-        let processor = "\(percent(snapshot.load?.overall.total))  \(temperature(snapshot.temperature?.average))"
+        let processor = "CPU \(percent(snapshot.load?.overall.total))  \(temperature(snapshot.temperature?.average))"
         return "\(processor)   GPU \(percent(snapshot.gpuLoad?.device))  \(temperature(snapshot.gpuTemperature?.average))"
     }
 }

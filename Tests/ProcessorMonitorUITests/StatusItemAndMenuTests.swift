@@ -10,20 +10,23 @@ extension AppKitTests {
             let menu = NSMenu()
             let controller = StatusItemController(statusBar: bar, menu: menu)
             let button = try #require(controller.item.button)
-            #expect(button.title == "—  —   GPU —  —")
+            #expect(button.title == "CPU —  —   GPU —  —")
             #expect(controller.item.menu === menu)
-            #expect(button.image != nil)
+            // Text labels instead of a chip glyph, so "CPU" reads like "GPU".
+            #expect(button.image == nil)
             #expect(button.font == StatusItemController.font)
             #expect(StatusItemController.font == NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular))
 
             // A fixed length means a changing reading never resizes the item, which on macOS
             // re-lays out the menu bar and sends a scene update to the system on every tick.
-            let widest = ("100%  100°C   GPU 100%  100°C" as NSString).size(withAttributes: [.font: StatusItemController.font]).width
+            let widest = ("CPU 100%  100°C   GPU 100%  100°C" as NSString).size(withAttributes: [.font: StatusItemController.font]).width
             #expect(controller.item.length == StatusItemController.length)
-            #expect(StatusItemController.length >= widest + 16)
-            #expect(StatusItemController.length <= widest + 40)
-            controller.update(title: "100%  100°C   GPU 100%  100°C")
+            #expect(StatusItemController.length >= widest + 8)
+            #expect(StatusItemController.length <= widest + 20)
+            controller.update(title: "CPU 100%  100°C   GPU 100%  100°C")
             #expect(controller.item.length == StatusItemController.length)
+            // The widest reading fits without truncation, margins included.
+            #expect((button.cell?.cellSize.width ?? .infinity) <= StatusItemController.length)
             controller.update(title: "23%  49°C")
             controller.update(title: "23%  49°C")
             #expect(button.title == "23%  49°C")

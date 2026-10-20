@@ -8,8 +8,8 @@ A lightweight, native menu bar monitor for Apple Silicon processors.
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black)
 ![Apple Silicon](https://img.shields.io/badge/arch-arm64-black)
 
-The menu bar shows the processor load and temperature next to a chip icon, followed by the GPU's,
-e.g. `23%  49°C   GPU 5%  42°C`. Click it for every metric and the top processes, or open the dashboard:
+The menu bar shows the load and temperature of the processor and the GPU, e.g.
+`CPU 23%  49°C   GPU 5%  42°C`. Click it for every metric and the top processes, or open the dashboard:
 
 <p align="center">
   <picture>
@@ -23,7 +23,7 @@ e.g. `23%  49°C   GPU 5%  42°C`. Click it for every metric and the top process
 ## Features
 
 - **Menu bar item** with the current processor and GPU load and temperature, e.g.
-  `23%  49°C   GPU 5%  42°C`.
+  `CPU 23%  49°C   GPU 5%  42°C`.
 - **Processor load** with its user / system / idle split.
 - **Occupancy** of every core, grouped by core cluster. Cluster names come from the chip itself:
   *Super* and *Performance* on M5, *Performance* and *Efficiency* on earlier chips.
@@ -68,7 +68,7 @@ The installer puts these files on your Mac:
 
 ## Usage
 
-Click the processor icon in the menu bar to see:
+Click the readings in the menu bar to see:
 
 - **Processor load** with user, system and idle shares
 - **Temperature**, average and maximum

@@ -24,12 +24,12 @@ import Testing
 
     @Test func statusTitleShowsProcessorThenGPU() {
         var snapshot = MonitorSnapshot.empty
-        #expect(MetricFormatter.statusTitle(snapshot) == "—  —   GPU —  —")
+        #expect(MetricFormatter.statusTitle(snapshot) == "CPU —  —   GPU —  —")
         snapshot.load = CPULoad(overall: LoadBreakdown(user: 0.2, system: 0.03, idle: 0.77), cores: [])
         snapshot.temperature = TemperatureSummary(average: 48.6, maximum: 60, sensorCount: 3)
         snapshot.gpuLoad = GPULoad(device: 0.054, renderer: 0.05, tiler: 0.01)
         snapshot.gpuTemperature = TemperatureSummary(average: 41.6, maximum: 43, sensorCount: 8)
-        #expect(MetricFormatter.statusTitle(snapshot) == "23%  49°C   GPU 5%  42°C")
+        #expect(MetricFormatter.statusTitle(snapshot) == "CPU 23%  49°C   GPU 5%  42°C")
     }
 }
 

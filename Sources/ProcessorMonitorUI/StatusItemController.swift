@@ -1,14 +1,15 @@
 import AppKit
 import ProcessorMonitorCore
 
-/// The menu bar item: a CPU glyph and "23%  49°C   GPU 5%  42°C". Redrawing it is the app's main running cost,
+/// The menu bar item: "CPU 23%  49°C   GPU 5%  42°C", text only, so both processors are labelled
+/// the same way. Redrawing it is the app's main running cost,
 /// so the item has a fixed length (a changing reading never resizes it, which would re-lay out
 /// the menu bar and send a scene update to the system) and the title is only set when it changes.
 @MainActor
 public final class StatusItemController {
     static let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-    /// Glyph (16 pt), spacing and margins around the widest reading.
-    static let length = ceil(("100%  100°C   GPU 100%  100°C" as NSString).size(withAttributes: [.font: font]).width) + 30
+    /// The widest reading plus the button's margins.
+    static let length = ceil(("CPU 100%  100°C   GPU 100%  100°C" as NSString).size(withAttributes: [.font: font]).width) + 12
 
     private let statusBar: NSStatusBar
     let item: NSStatusItem
@@ -20,8 +21,6 @@ public final class StatusItemController {
         item = statusBar.statusItem(withLength: Self.length)
         item.menu = menu
         item.button?.font = Self.font
-        item.button?.image = NSImage(systemSymbolName: "cpu", accessibilityDescription: "Processor")
-        item.button?.imagePosition = .imageLeading
         item.button?.toolTip = "macOS Processor Monitor"
         update(title: MetricFormatter.statusTitle(.empty))
     }

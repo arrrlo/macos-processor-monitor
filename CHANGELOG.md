@@ -19,6 +19,8 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
 ### Changed
 
 - The dashboard's core bars stretch to fill the Occupancy card from edge to edge.
+- The menu bar labels the processor "CPU" instead of showing a chip icon, matching "GPU":
+  `CPU 23%  49°C   GPU 5%  42°C`.
 
 ### Fixed
 
