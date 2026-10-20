@@ -37,6 +37,8 @@ jobs:
           VERSION=$(tr -d '[:space:]' < VERSION)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           test "v$VERSION" = "$TAG" || { echo "Tag $TAG does not match VERSION $VERSION"; exit 1; }
+          # Fails without a CHANGELOG.md entry for this version. Tags before v1.0.1 have no changelog.
+          if [[ -f CHANGELOG.md ]]; then scripts/release-notes.sh "$VERSION" > changes.md; else : > changes.md; fi
 
       - name: Cache swift-syntax build
         uses: actions/cache@v6
@@ -64,7 +66,12 @@ jobs:
         run: |
           PKG="build/macos-processor-monitor-$VERSION.pkg"
           SHA=$(cut -d' ' -f1 < "$PKG.sha256")
-          cat > notes.md <<EOF
+          if [[ -s changes.md ]]; then
+            { printf "## What's new\n\n"; cat changes.md; echo; } > notes.md
+          else
+            : > notes.md
+          fi
+          cat >> notes.md <<EOF
           ## Install
 
           1. Download **macos-processor-monitor-$VERSION.pkg** below and open it.

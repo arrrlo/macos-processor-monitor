@@ -25,6 +25,8 @@ and CI.
 |---|---|
 | `make gate` | All tests pass; **100% line, function and region coverage** of `Sources/` (only the two `main.swift` entry points are excluded); **CRAP ≤ 16** for every function. Also checks the `Tools/` package. |
 | `make mutate CHANGED=origin/main` | Every mutant in the files you changed is killed. Run plain `make mutate` for the whole package (about 20 minutes). |
+| `make run`, then `make overhead SECONDS=60` | No CPU or memory regression against the numbers in [README › Overhead](README.md#how-it-works), measured with the menu and dashboard closed. Compare the physical footprint, not resident memory. |
+| `CHANGELOG.md` | Every change adds a line under **Unreleased** (`Added`, `Changed`, `Fixed`, `Removed`, or `Internal` for tooling and tests). Doc comments, the README and SECURITY.md are updated wherever they describe what you changed. |
 
 ## Writing code that can be fully covered
 

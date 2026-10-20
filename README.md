@@ -51,6 +51,8 @@ sudo installer -pkg macos-processor-monitor-1.0.0.pkg -target /
 
 Requirements: a Mac with Apple Silicon and macOS 14 Sonoma or later.
 
+What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
+
 The installer puts these files on your Mac:
 
 | What | Where |
