@@ -10,6 +10,7 @@ import Testing
 extension AppKitTests {
     @MainActor @Suite(.enabled(if: ProcessInfo.processInfo.environment["PM_SCREENSHOT_DIR"] != nil))
     struct ScreenshotTests {
+        static let interval: UInt64 = 1
         let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["PM_SCREENSHOT_DIR"] ?? "/tmp")
 
         func liveSnapshot() async -> (MonitorSnapshot, CPUTopology, GPUInfo?) {
@@ -24,8 +25,21 @@ extension AppKitTests {
                 service.topProcesses(limit: 10) { continuation.resume(returning: $0) }
             }
             withExtendedLifetime(service) {}
+            // 30 GPU readings 1 s apart, as the app collects them at the 1 s interval (AppKit suites have a
+            // one-minute time limit, too short for the default 2 s).
             let gpu = GPUReader()
-            let snapshot = MonitorSnapshot(
+            var history = GPULoadHistory()
+            for _ in 0..<GPULoadHistory.capacity {
+                if let reading = gpu.read() {
+                    history = history.appending(reading.device)
+                }
+                try? await Task.sleep(nanoseconds: Self.interval * 1_000_000_000)
+            }
+            let gpuService = GPUProcessesService.live()
+            let gpuProcesses = await withCheckedContinuation { continuation in
+                gpuService.topProcesses(limit: 10) { continuation.resume(returning: $0) }
+            }
+            var snapshot = MonitorSnapshot(
                 load: load,
                 clusters: topology.clusterLoads(load),
                 temperature: CPUTemperatureReader.live().read(),
@@ -33,6 +47,8 @@ extension AppKitTests {
                 gpuLoad: gpu.read(),
                 gpuTemperature: GPUTemperatureReader.live().read()
             )
+            snapshot.gpuHistory = history
+            snapshot.topGPUProcesses = gpuProcesses
             return (snapshot, topology, gpu.info())
         }
 
@@ -48,7 +64,7 @@ extension AppKitTests {
         @Test func dashboard() async throws {
             let (snapshot, topology, gpu) = await liveSnapshot()
             let apps = ProcessIdentityResolver.live().resolve(snapshot.topProcesses?.processes ?? [])
-            let model = DashboardModel(snapshot: snapshot, clusterNames: topology.clusters.map(\.name), apps: apps, gpu: gpu)
+            let model = DashboardModel(snapshot: snapshot, clusterNames: topology.clusters.map(\.name), apps: apps, gpu: gpu, refreshInterval: Double(Self.interval))
             for (name, appearance) in [("dashboard-dark.png", NSAppearance.Name.darkAqua), ("dashboard-light.png", .aqua)] {
                 let view = NSHostingView(rootView: DashboardView(model: model).background(Color(nsColor: .windowBackgroundColor)))
                 view.frame = NSRect(origin: .zero, size: view.fittingSize)

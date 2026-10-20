@@ -7,12 +7,21 @@ public struct DashboardModel {
     public let clusterNames: [String]
     public let apps: [Int32: AppInfo]
     public let gpu: GPUInfo?
+    /// Seconds between readings, which sets how much time the GPU activity bars span.
+    public let refreshInterval: Double
 
-    public init(snapshot: MonitorSnapshot, clusterNames: [String], apps: [Int32: AppInfo], gpu: GPUInfo? = nil) {
+    public init(
+        snapshot: MonitorSnapshot,
+        clusterNames: [String],
+        apps: [Int32: AppInfo],
+        gpu: GPUInfo? = nil,
+        refreshInterval: Double = RefreshInterval.standard.seconds
+    ) {
         self.snapshot = snapshot
         self.clusterNames = clusterNames
         self.apps = apps
         self.gpu = gpu
+        self.refreshInterval = refreshInterval
     }
 
     var gpuCaption: String {
@@ -26,6 +35,20 @@ public struct DashboardModel {
         return "Renderer \(MetricFormatter.percent(load?.renderer)) · Tiler \(MetricFormatter.percent(load?.tiler))"
     }
 
+    /// One slot per bar, oldest first; slots not filled yet (after a start or an interval change) are nil.
+    var historyBars: [Double?] {
+        let values = snapshot.gpuHistory.values
+        return Array(repeating: nil, count: GPULoadHistory.capacity - values.count) + values.map { $0 }
+    }
+
+    var historySpan: String {
+        "Last \(Int((Double(GPULoadHistory.capacity) * refreshInterval).rounded())) s"
+    }
+
+    var cpuProcessesTitle: String { MenuText.processHeader(snapshot.topProcesses?.scope, kind: "CPU") }
+    var gpuProcessesTitle: String { MenuText.processHeader(snapshot.topGPUProcesses?.scope, kind: "GPU") }
+    var gpuProcessRows: [MenuText.ProcessRow] { MenuText.processRows(snapshot.topGPUProcesses) }
+
     var text: MenuText { MenuText(snapshot, clusterNames: clusterNames) }
 
     func coreLoads(for cluster: String) -> [CoreLoad] {
@@ -36,39 +59,55 @@ public struct DashboardModel {
         width * CGFloat(min(max(fraction, 0), 1))
     }
 
-    /// Width of each of a cluster's `count` core bars so the bars and their gaps span a full-width card.
+    /// Width of each of `count` bars so the bars and their gaps span the occupancy column.
     static func coreBarWidth(count: Int) -> CGFloat {
         guard count > 0 else { return 0 }
-        return (DashboardView.cardContentWidth - DashboardView.coreSpacing * CGFloat(count - 1)) / CGFloat(count)
+        return (DashboardView.barsWidth - DashboardView.barSpacing * CGFloat(count - 1)) / CGFloat(count)
     }
+
+    static let historyBarWidth = coreBarWidth(count: GPULoadHistory.capacity)
 }
 
-/// Read-only dashboard. It has no controls on purpose: every action lives in the menu.
+/// Read-only dashboard, one row per processor: load, temperature, occupancy (load over time for
+/// the GPU, which has no per-core figure) and top processes. Every card in a row is as tall as the
+/// tallest, the process list. It has no controls on purpose: every action lives in the menu.
 struct DashboardView: View {
-    static let width: CGFloat = 600
     static let padding: CGFloat = 18
+    static let spacing: CGFloat = 14
     static let cardPadding: CGFloat = 14
-    /// The width a full-width card leaves for its content.
-    static let cardContentWidth: CGFloat = width - 2 * padding - 2 * cardPadding
-    static let coreSpacing: CGFloat = 4
+    /// Fits the 250 pt load bar and its legend.
+    static let loadWidth: CGFloat = LoadCard.barWidth + 2 * cardPadding
+    static let temperatureWidth: CGFloat = 220
+    /// Sized so 6, 12 and 30 bars with 4 pt gaps all come out in whole points.
+    static let occupancyWidth: CGFloat = 384
+    static let processesWidth: CGFloat = 380
+    /// The width the occupancy and activity cards leave for their bars.
+    static let barsWidth: CGFloat = occupancyWidth - 2 * cardPadding
+    static let barSpacing: CGFloat = 4
 
     let model: DashboardModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
-                LoadCard(model: model)
-                TemperatureCard(title: "Temperature", summary: model.snapshot.temperature, caption: "Processor die sensors")
+        Grid(horizontalSpacing: Self.spacing, verticalSpacing: Self.spacing) {
+            GridRow {
+                LoadCard(model: model).frame(width: Self.loadWidth)
+                TemperatureCard(title: "CPU temperature", summary: model.snapshot.temperature, caption: "Processor die sensors")
+                    .frame(width: Self.temperatureWidth)
+                OccupancyCard(model: model).frame(width: Self.occupancyWidth)
+                ProcessesCard(title: model.cpuProcessesTitle, valueHeader: "CPU", rows: model.text.processes, apps: model.apps)
+                    .frame(width: Self.processesWidth)
             }
-            OccupancyCard(model: model)
-            HStack(alignment: .top, spacing: 14) {
-                GPULoadCard(model: model)
+            GridRow {
+                GPULoadCard(model: model).frame(width: Self.loadWidth)
                 TemperatureCard(title: "GPU temperature", summary: model.snapshot.gpuTemperature, caption: "GPU sensors")
+                    .frame(width: Self.temperatureWidth)
+                GPUActivityCard(model: model).frame(width: Self.occupancyWidth)
+                ProcessesCard(title: model.gpuProcessesTitle, valueHeader: "GPU", rows: model.gpuProcessRows, apps: model.apps)
+                    .frame(width: Self.processesWidth)
             }
-            ProcessesCard(model: model)
         }
         .padding(Self.padding)
-        .frame(width: Self.width)
+        .fixedSize()
     }
 }
 
@@ -87,7 +126,8 @@ private struct Card<Content: View>: View {
             content
         }
         .padding(DashboardView.cardPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // Fills its grid cell, so every card in a row is as tall as the tallest.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.06)))
     }
 }
@@ -99,7 +139,7 @@ private struct LoadCard: View {
     var body: some View {
         let text = model.text
         let overall = model.snapshot.load?.overall
-        Card("Processor load") {
+        Card("CPU load") {
             Text(text.load.value).font(.system(size: 40, weight: .semibold, design: .rounded)).monospacedDigit()
             HStack(spacing: 0) {
                 Rectangle().fill(Color.accentColor).frame(width: DashboardModel.barWidth(overall?.user ?? 0, of: Self.barWidth))
@@ -130,7 +170,6 @@ private struct Legend: View {
     }
 }
 
-/// Whole-GPU load: macOS reports no per-core figure, so the GPU's cores are only counted in the caption.
 private struct GPULoadCard: View {
     let model: DashboardModel
 
@@ -146,7 +185,6 @@ private struct GPULoadCard: View {
             .background(Color.gray.opacity(0.25))
             .clipShape(Capsule())
             Text(model.gpuSplit).font(.callout).monospacedDigit().foregroundStyle(.secondary)
-            Text(model.gpuCaption).font(.caption).foregroundStyle(.tertiary)
         }
     }
 }
@@ -171,7 +209,7 @@ private struct OccupancyCard: View {
     let model: DashboardModel
 
     var body: some View {
-        Card("Occupancy") {
+        Card("CPU occupancy") {
             ForEach(Array(zip(model.clusterNames, model.text.clusters)), id: \.0) { name, row in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
@@ -181,7 +219,7 @@ private struct OccupancyCard: View {
                     }
                     let cores = model.coreLoads(for: name)
                     let barWidth = DashboardModel.coreBarWidth(count: cores.count)
-                    HStack(alignment: .bottom, spacing: DashboardView.coreSpacing) {
+                    HStack(alignment: .bottom, spacing: DashboardView.barSpacing) {
                         ForEach(cores, id: \.index) { core in
                             CoreBar(core: core, width: barWidth)
                         }
@@ -199,36 +237,74 @@ private struct CoreBar: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            ZStack(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 2).fill(Color.gray.opacity(0.2))
-                RoundedRectangle(cornerRadius: 2).fill(Color.accentColor).frame(height: DashboardModel.barWidth(core.load, of: Self.height))
-            }
-            .frame(width: width, height: Self.height)
+            LoadBar(load: core.load, width: width, height: Self.height)
             Text(verbatim: String(core.index)).font(.system(size: 8)).foregroundStyle(.secondary)
         }
         .help("Core \(core.index): \(MetricFormatter.percent(core.load))")
     }
 }
 
-private struct ProcessesCard: View {
+/// A vertical bar filled from the bottom to `load` (0...1).
+private struct LoadBar: View {
+    let load: Double
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: 2).fill(Color.gray.opacity(0.2))
+            RoundedRectangle(cornerRadius: 2).fill(Color.accentColor).frame(height: DashboardModel.barWidth(load, of: height))
+        }
+        .frame(width: width, height: height)
+    }
+}
+
+/// The GPU's counterpart of the core bars: macOS reports one load for the whole GPU, so its
+/// activity is shown over time instead, newest on the right.
+private struct GPUActivityCard: View {
+    static let barHeight: CGFloat = 130
     let model: DashboardModel
 
     var body: some View {
-        let text = model.text
-        Card(text.processHeader) {
+        Card("GPU activity") {
+            HStack {
+                Text(model.historySpan)
+                Spacer()
+                Text(MetricFormatter.percent(model.snapshot.gpuLoad?.device)).monospacedDigit()
+            }
+            HStack(alignment: .bottom, spacing: DashboardView.barSpacing) {
+                ForEach(Array(model.historyBars.enumerated()), id: \.offset) { _, load in
+                    LoadBar(load: load ?? 0, width: DashboardModel.historyBarWidth, height: Self.barHeight)
+                }
+            }
+            Text(model.gpuCaption).font(.caption).foregroundStyle(.tertiary)
+            Text("macOS reports one load for the whole GPU").font(.caption).foregroundStyle(.tertiary)
+        }
+    }
+}
+
+/// A top-10 list. The name column takes the spare width, so the numbers sit at the card's right edge.
+private struct ProcessesCard: View {
+    let title: String
+    let valueHeader: String
+    let rows: [MenuText.ProcessRow]
+    let apps: [Int32: AppInfo]
+
+    var body: some View {
+        Card(title) {
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
                 GridRow {
                     Text("")
-                    Text("Name")
-                    Text("PID")
-                    Text("CPU").gridColumnAlignment(.trailing)
+                    Text("Name").frame(maxWidth: .infinity, alignment: .leading)
+                    Text("PID").gridColumnAlignment(.trailing)
+                    Text(valueHeader).gridColumnAlignment(.trailing)
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 // A fixed number of rows keeps the window from resizing as the list changes.
                 ForEach(0..<StatusMenuController.processSlots, id: \.self) { index in
-                    if index < text.processes.count {
-                        ProcessRowView(process: text.processes[index], app: model.apps[text.processes[index].pid])
+                    if index < rows.count {
+                        ProcessRowView(process: rows[index], app: apps[rows[index].pid])
                     } else {
                         GridRow { Text(" ") }
                     }
@@ -249,7 +325,7 @@ private struct ProcessRowView: View {
             } else {
                 Image(systemName: "gearshape").foregroundStyle(.secondary).frame(width: 16, height: 16)
             }
-            Text(app?.name ?? process.row.title).lineLimit(1).frame(width: 330, alignment: .leading)
+            Text(app?.name ?? process.row.title).lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
             // verbatim: a PID is an identifier, not a number to format with thousands separators.
             Text(verbatim: String(process.pid)).monospacedDigit().foregroundStyle(.secondary)
             Text(process.row.value).monospacedDigit()

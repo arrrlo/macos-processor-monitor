@@ -45,9 +45,11 @@ extension AppKitTests {
                 gpu: GPUInfo(name: "Apple M5 Max", coreCount: 32)
             )
             let size = render(model)
-            #expect(size.width >= 560)
-            // Processor row, occupancy, GPU row and processes.
-            #expect(size.height > 780)
+            // Two rows of four cards: narrower than a 13-inch screen (1470 pt) and far shorter than one.
+            #expect(size.width > 1300)
+            #expect(size.width < 1470)
+            #expect(size.height > 500)
+            #expect(size.height < 720)
         }
 
         @Test func rendersPlaceholdersWithoutData() {
@@ -82,16 +84,49 @@ extension AppKitTests {
             #expect(empty.gpuSplit == "Renderer — · Tiler —")
         }
 
-        @Test func coreBarsSpanTheFullCardWidth() {
-            #expect(DashboardView.cardContentWidth == 536)
-            #expect(DashboardModel.coreBarWidth(count: 12) == 41)
-            #expect(DashboardModel.coreBarWidth(count: 6) == 86)
-            #expect(DashboardModel.coreBarWidth(count: 1) == 536)
+        @Test func barsFillTheOccupancyAndActivityCards() {
+            // The load card holds the 250 pt load bar inside 14 pt padding on each side.
+            #expect(DashboardView.loadWidth == 278)
+            #expect(DashboardView.barsWidth == 356)
+            #expect(DashboardModel.coreBarWidth(count: 12) == 26)
+            #expect(DashboardModel.coreBarWidth(count: 6) == 56)
+            #expect(DashboardModel.coreBarWidth(count: 1) == 356)
             #expect(DashboardModel.coreBarWidth(count: 0) == 0)
-            for count in [6, 12] {
-                let row = DashboardModel.coreBarWidth(count: count) * CGFloat(count) + DashboardView.coreSpacing * CGFloat(count - 1)
-                #expect(row == DashboardView.cardContentWidth)
+            #expect(DashboardModel.historyBarWidth == 8)
+            for count in [6, 12, GPULoadHistory.capacity] {
+                let row = DashboardModel.coreBarWidth(count: count) * CGFloat(count) + DashboardView.barSpacing * CGFloat(count - 1)
+                #expect(row == DashboardView.barsWidth)
             }
+        }
+
+        @Test func gpuActivityPresentation() {
+            var snapshot = MonitorSnapshot.sample
+            snapshot.gpuHistory = GPULoadHistory().appending(0.1).appending(0.5)
+            let model = DashboardModel(snapshot: snapshot, clusterNames: [], apps: [:], refreshInterval: 2)
+            // Oldest on the left; slots not yet filled stay empty.
+            #expect(model.historyBars.count == 30)
+            #expect(model.historyBars.prefix(28).allSatisfy { $0 == nil })
+            #expect(model.historyBars.suffix(2) == [0.1, 0.5])
+            #expect(model.historySpan == "Last 60 s")
+            #expect(DashboardModel(snapshot: .empty, clusterNames: [], apps: [:], refreshInterval: 5).historySpan == "Last 150 s")
+            #expect(DashboardModel(snapshot: .empty, clusterNames: [], apps: [:]).historySpan == "Last 60 s")
+            #expect(DashboardModel(snapshot: .empty, clusterNames: [], apps: [:]).historyBars == Array(repeating: nil, count: 30))
+        }
+
+        @Test func processListsForBothProcessors() {
+            var snapshot = MonitorSnapshot.sample
+            snapshot.topGPUProcesses = TopProcessesResult(processes: [ProcessUsage(pid: 405, name: "WindowServer", cpuPercent: 3.2)], scope: .allProcesses)
+            let model = DashboardModel(snapshot: snapshot, clusterNames: [], apps: [:])
+            #expect(model.cpuProcessesTitle == "Top CPU processes")
+            #expect(model.gpuProcessesTitle == "Top GPU processes")
+            #expect(model.gpuProcessRows == [MenuText.ProcessRow(pid: 405, row: MenuText.Row(title: "WindowServer", value: "3.2%"))])
+            let empty = DashboardModel(snapshot: .empty, clusterNames: [], apps: [:])
+            #expect(empty.cpuProcessesTitle == "Top CPU processes — measuring…")
+            #expect(empty.gpuProcessesTitle == "Top GPU processes — measuring…")
+            #expect(empty.gpuProcessRows.isEmpty)
+            var limited = MonitorSnapshot.sample
+            limited.topProcesses = TopProcessesResult(processes: [], scope: .currentUser)
+            #expect(DashboardModel(snapshot: limited, clusterNames: [], apps: [:]).cpuProcessesTitle == "Top CPU processes (your processes only)")
         }
     }
 

@@ -15,12 +15,18 @@ tooling and tests) and versions follow [Semantic Versioning](https://semver.org/
   GPU sensors.
 - A GPU row in the dashboard: GPU load with its renderer and tiler shares, GPU temperature, and the
   chip's name and GPU core count.
+- The GPU's top 10 processes in the dashboard, by share of GPU time, for every user's processes.
+- GPU activity in the dashboard: the last 30 GPU load readings as bars, the GPU's counterpart of the
+  per-core occupancy (macOS has no per-core GPU load).
 
 ### Changed
 
 - The dashboard's core bars stretch to fill the Occupancy card from edge to edge.
 - The menu bar labels the processor "CPU" instead of showing a chip icon, matching "GPU":
   `CPU 23%  49°C   GPU 5%  42°C`.
+- The dashboard has one row per processor (load, temperature, occupancy or activity, top 10
+  processes), with every card the same height. It is wider and much shorter than before, and the
+  process lists keep their numbers at the right edge.
 
 ### Fixed
 

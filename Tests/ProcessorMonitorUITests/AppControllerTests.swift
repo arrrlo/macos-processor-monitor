@@ -164,6 +164,7 @@ extension AppKitTests {
             #expect(harness.controller.dashboard.model.snapshot.temperature?.average == 48.6)
             #expect(harness.controller.dashboard.model.clusterNames == ["Super", "Performance"])
             #expect(harness.controller.dashboard.model.gpu == GPUInfo(name: "Apple M5 Max", coreCount: 32))
+            #expect(harness.controller.dashboard.model.refreshInterval == 2)
             #expect(harness.controller.dashboard.model.snapshot.gpuTemperature?.average == 41.6)
             #expect(harness.sources.processes.requests == [10])
             #expect(harness.sources.gpuProcesses.requests == [10])

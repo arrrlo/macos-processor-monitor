@@ -75,9 +75,7 @@ public struct MenuText: Equatable, Sendable {
         gpuLoad = Row(title: "GPU load", value: MetricFormatter.percent(snapshot.gpuLoad?.device))
         gpuTemperature = Row(title: "GPU temperature", value: Self.temperatureValue(snapshot.gpuTemperature))
         processHeader = Self.processHeader(snapshot.topProcesses?.scope)
-        processes = (snapshot.topProcesses?.processes ?? []).map {
-            ProcessRow(pid: $0.pid, row: Row(title: $0.name, value: MetricFormatter.processPercent($0.cpuPercent)))
-        }
+        processes = Self.processRows(snapshot.topProcesses)
     }
 
     private static func temperatureValue(_ summary: TemperatureSummary?) -> String {
@@ -85,11 +83,20 @@ public struct MenuText: Equatable, Sendable {
         return "\(MetricFormatter.temperature(summary.average)) (max \(MetricFormatter.temperature(summary.maximum)))"
     }
 
-    private static func processHeader(_ scope: ProcessScope?) -> String {
+    /// "Top processes", or "Top CPU processes" with a `kind`, plus what the list covers.
+    public static func processHeader(_ scope: ProcessScope?, kind: String? = nil) -> String {
+        let title = ["Top", kind, "processes"].compactMap { $0 }.joined(separator: " ")
         switch scope {
-        case nil: "Top processes — measuring…"
-        case .currentUser: "Top processes (your processes only)"
-        case .allProcesses: "Top processes"
+        case nil: return "\(title) — measuring…"
+        case .currentUser: return "\(title) (your processes only)"
+        case .allProcesses: return title
+        }
+    }
+
+    /// One row per listed process, its share formatted like Activity Monitor's.
+    public static func processRows(_ result: TopProcessesResult?) -> [ProcessRow] {
+        (result?.processes ?? []).map {
+            ProcessRow(pid: $0.pid, row: Row(title: $0.name, value: MetricFormatter.processPercent($0.cpuPercent)))
         }
     }
 }

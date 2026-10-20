@@ -47,6 +47,18 @@ extension MonitorSnapshot {
         gpuLoad: GPULoad(device: 0.18, renderer: 0.17, tiler: 0.12),
         gpuTemperature: TemperatureSummary(average: 42.2, maximum: 43.4, sensorCount: 8)
     )
+    .with(gpuHistory: [0.1, 0.4, 0.18], topGPUProcesses: TopProcessesResult(
+        processes: [ProcessUsage(pid: 100, name: "WindowServer", cpuPercent: 9.5), ProcessUsage(pid: 200, name: "Finder", cpuPercent: 0.4)],
+        scope: .allProcesses
+    ))
+
+    /// The sample with GPU history and a GPU process list.
+    func with(gpuHistory: [Double], topGPUProcesses: TopProcessesResult) -> MonitorSnapshot {
+        var snapshot = self
+        snapshot.gpuHistory = gpuHistory.reduce(GPULoadHistory()) { $0.appending($1) }
+        snapshot.topGPUProcesses = topGPUProcesses
+        return snapshot
+    }
 }
 
 let testIcon = NSImage(size: NSSize(width: 32, height: 32))

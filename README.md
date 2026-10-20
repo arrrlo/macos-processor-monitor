@@ -14,7 +14,7 @@ The menu bar shows the load and temperature of the processor and the GPU, e.g.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
-    <img src="docs/images/dashboard-light.png" width="600" alt="Dashboard with processor load, temperature, per-core occupancy of the Super and Performance clusters, GPU load and temperature, and the top 10 processes">
+    <img src="docs/images/dashboard-light.png" width="880" alt="Dashboard with one row for the CPU and one for the GPU: load, temperature, per-core occupancy of the Super and Performance clusters or GPU activity over the last readings, and the top 10 processes of each">
   </picture>
 </p>
 
@@ -33,7 +33,10 @@ The menu bar shows the load and temperature of the processor and the GPU, e.g.
 - **GPU temperature**, the average and maximum of the GPU's sensors.
 - **Top 10 processes** by CPU usage, system-wide (including `WindowServer`, `kernel_task` and other
   system processes), with app names and icons.
-- **Dashboard window** with all of the above, plus a per-core chart and the GPU's name and core count.
+- **Top 10 GPU processes**, by share of GPU time, system-wide, measured without the helper.
+- **Dashboard window** with one row per processor, every card the same height: load, temperature,
+  per-core occupancy, and the top 10 processes. macOS has no per-core GPU load, so the GPU's row shows
+  GPU activity over the last 30 readings instead, with the chip's name and GPU core count.
 - **Starts at login**, with a refresh interval of 1, 2 or 5 seconds.
 - **Built to stay out of the way.** One timer with leeway so macOS can batch wake-ups. Processes are
   only measured while you look at them. Nothing runs while the displays sleep.
@@ -100,6 +103,7 @@ sudo "/Applications/macOS Processor Monitor.app/Contents/Resources/uninstall.sh"
 | GPU load | `Device Utilization %` from the `PerformanceStatistics` the graphics driver keeps on its IORegistry entry (`AGXAccelerator`). Reading it is one property copy per tick. |
 | GPU temperature | The SMC's GPU sensors (`Tg*` keys; 84 on an M5 Max), read through the AppleSMC user client with read commands only. They agree within about a degree, so 8 spread across them are read. |
 | Top processes | `proc_pidinfo(PROC_PIDTASKALLINFO)` CPU time deltas for every process. |
+| Top GPU processes | The GPU time (`AppUsage` › `accumulatedGPUTime`, in nanoseconds) that the graphics driver records for every client in the IORegistry, added up per process and compared between samples. Measured only while the dashboard is visible. |
 
 **Why a root helper?** macOS only lets administrators read the CPU time of other users'
 processes. That covers about a third of all processes, including `WindowServer` and `kernel_task`.

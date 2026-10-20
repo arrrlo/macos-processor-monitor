@@ -163,7 +163,13 @@ public final class AppController {
 
     private func refreshDashboard() {
         guard dashboard.isVisible else { return }
-        dashboard.update(DashboardModel(snapshot: latest, clusterNames: clusterNames, apps: resolveApps(), gpu: gpu))
+        dashboard.update(DashboardModel(
+            snapshot: latest,
+            clusterNames: clusterNames,
+            apps: resolveApps(),
+            gpu: gpu,
+            refreshInterval: settings.refreshInterval.seconds
+        ))
     }
 
     private func resolveApps() -> [Int32: AppInfo] {
